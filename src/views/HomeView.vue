@@ -62,16 +62,6 @@
       <div class="header-right">
         <div class="status-dot" :class="{ connected: connectedCount > 0 }"/>
         <span class="status-text">{{ connectedCount > 0 ? statusName : 'NO DEVICE' }}</span>
-        <button
-          class="btn-scan"
-          :class="{ 'pulse-glow': connectedCount === 0 }"
-          @click="showScan = true"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/>
-          </svg>
-          SCAN
-        </button>
         <button class="btn-devices" @click="drawerOpen = !drawerOpen">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="2" y="3" width="20" height="4" rx="1"/>
@@ -184,7 +174,7 @@
           <div class="no-device-icon">⚡</div>
           <div class="no-device-msg">No device selected</div>
           <div class="no-device-sub">Scan for a device to get started</div>
-          <button class="btn-scan-empty pulse-glow" @click="showScan = true">SCAN FOR DEVICES</button>
+          <button class="btn-scan-empty" @click="showScan = true">SCAN FOR DEVICES</button>
         </div>
 
         <template v-if="activeDev">
@@ -726,10 +716,31 @@ header.mobile .logo-icon    { width: 42px; height: 42px; }
 .no-device-msg  { font-family: var(--font-disp); font-size: 22px; letter-spacing: 2px; color: var(--sub); }
 .no-device-sub  { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; }
 .btn-scan-empty {
-  padding: 10px 24px; border-radius: 8px; border: 1px solid var(--accent2);
-  background: transparent; color: var(--accent2);
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
-  margin-top: 8px; cursor: pointer; position: relative; z-index: 0;
+  padding: 12px 32px; border-radius: var(--r);
+  border: 1px solid transparent;
+  background: var(--surface); color: var(--text);
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 8px; cursor: pointer;
+  position: relative; z-index: 0;
+  transition: color 0.3s;
+}
+.btn-scan-empty:hover { color: var(--accent2); }
+.btn-scan-empty::before {
+  content: ''; position: absolute; inset: -1px;
+  border-radius: calc(var(--r) + 1px);
+  background: conic-gradient(
+    from var(--glow-angle),
+    var(--accent2) 0%, var(--accent) 25%,
+    transparent 40%, transparent 60%,
+    var(--accent) 75%, var(--accent2) 100%
+  );
+  animation: borderSpin 3s linear infinite; z-index: -1;
+}
+.btn-scan-empty::after {
+  content: ''; position: absolute; inset: 1px;
+  border-radius: calc(var(--r) - 1px);
+  background: var(--surface); z-index: -1;
 }
 
 .panel-header {
