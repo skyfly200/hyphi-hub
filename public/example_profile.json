@@ -1,0 +1,24 @@
+{
+  "profl": {
+    "name": "Smart Sprout V1.1",
+    "sku": "SPRT-V1-ARTEMIS",
+    "img": "/assets/smart_sprout-V1.jpg",
+    "theme": "#4CAF50"
+  },
+  "light": {
+    "qty": 60,
+    "map": [
+      {"id": 0, "x": 50, "y": 95, "lbl": "Root"},
+      {"id": 1, "x": 50, "y": 20, "lbl": "Top"}
+    ],
+    "grps": [
+      {"name": "Stem", "ids": [0, 1]}
+    ]
+  },
+  "audio": {
+    "viz": [
+      {"id": 0, "name": "Pulse"},
+      {"id": 1, "name": "Spectrum"}
+    ]
+  }
+}
