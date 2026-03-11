@@ -2,11 +2,6 @@
   "name": "hyphi-hub",
   "version": "0.1.0",
   "private": true,
-  "description": "PWA BLE controller for Hyphi / Smart Sprout LED devices.   Built with **Vue 3 + Vite + Pinia + vite-plugin-pwa**.",
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "vite.config.js",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

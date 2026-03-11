@@ -1,36 +1,132 @@
 <template>
   <div class="app-shell">
 
-    <!-- ── Status bar ── -->
-    <div class="status-bar">
-      <div class="status-left">
-        <span class="app-logo">
-          <svg width="18" height="18" viewBox="-82 -82 164 164">
-            <defs>
-              <radialGradient id="sg" cx="40%" cy="35%" r="65%">
-                <stop offset="0%" stop-color="#c87fff"/>
-                <stop offset="100%" stop-color="#4a0080"/>
-              </radialGradient>
-            </defs>
-            <g fill="url(#sg)">
-              <circle cx="0" cy="2" r="8.5"/>
-              <circle cx="-3" cy="2.2" r="8.7"/>
-              <circle cx="-5" cy="-3.4" r="8.8"/>
-              <circle cx="2" cy="-7.7" r="9"/>
-              <circle cx="10" cy="-1.4" r="9.1"/>
-            </g>
-          </svg>
-        </span>
-        <span class="app-name">HYPHI HUB</span>
+    <!-- ── Header ── -->
+    <header :class="{ mobile: isMobile }">
+      <div class="logo">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="-82 -82 164 164">
+          <defs>
+            <radialGradient id="sphereGrad" cx="38%" cy="35%" r="60%">
+              <stop offset="0%"   stop-color="#e080ff"/>
+              <stop offset="45%"  stop-color="#800080"/>
+              <stop offset="100%" stop-color="#2d003d"/>
+            </radialGradient>
+            <radialGradient id="glowBg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stop-color="#4b0082" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#0a000f" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#cc00ff" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="74" fill="url(#glowBg)"/>
+          <g filter="url(#softShadow)">
+            <circle cx="0.44"   cy="1.93"   r="8.21"  fill="url(#sphereGrad)"/>
+            <circle cx="-3.28"  cy="2.22"   r="8.37"  fill="url(#sphereGrad)"/>
+            <circle cx="-4.89"  cy="-3.37"  r="8.52"  fill="url(#sphereGrad)"/>
+            <circle cx="1.83"   cy="-7.71"  r="8.68"  fill="url(#sphereGrad)"/>
+            <circle cx="9.81"   cy="-1.36"  r="8.83"  fill="url(#sphereGrad)"/>
+            <circle cx="5.79"   cy="10.37"  r="8.99"  fill="url(#sphereGrad)"/>
+            <circle cx="-8.83"  cy="10.68"  r="9.14"  fill="url(#sphereGrad)"/>
+            <circle cx="-15.04" cy="-4.98"  r="9.30"  fill="url(#sphereGrad)"/>
+            <circle cx="-0.9"   cy="-17.8"  r="9.46"  fill="url(#sphereGrad)"/>
+            <circle cx="18.07"  cy="-8.1"   r="9.61"  fill="url(#sphereGrad)"/>
+            <circle cx="15.51"  cy="15.29"  r="9.77"  fill="url(#sphereGrad)"/>
+            <circle cx="-9.42"  cy="21.81"  r="9.92"  fill="url(#sphereGrad)"/>
+            <circle cx="-25.72" cy="-0.95"  r="10.08" fill="url(#sphereGrad)"/>
+            <circle cx="-9.09"  cy="-26.19" r="10.23" fill="url(#sphereGrad)"/>
+            <circle cx="22.62"  cy="-19.24" r="10.39" fill="url(#sphereGrad)"/>
+            <circle cx="27.88"  cy="15.05"  r="10.55" fill="url(#sphereGrad)"/>
+            <circle cx="-4.17"  cy="33.4"   r="10.70" fill="url(#sphereGrad)"/>
+            <circle cx="-34.56" cy="8.7"    r="10.86" fill="url(#sphereGrad)"/>
+            <circle cx="-21.78" cy="-30.68" r="11.01" fill="url(#sphereGrad)"/>
+            <circle cx="21.79"  cy="-33.07" r="11.17" fill="url(#sphereGrad)"/>
+            <circle cx="40.65"  cy="8.74"   r="11.32" fill="url(#sphereGrad)"/>
+            <circle cx="6.89"   cy="43.01"  r="11.48" fill="url(#sphereGrad)"/>
+            <circle cx="-39.3"  cy="23.01"  r="11.64" fill="url(#sphereGrad)"/>
+            <circle cx="-37.24" cy="-29.52" r="11.79" fill="url(#sphereGrad)"/>
+            <circle cx="14.6"   cy="-47.3"  r="11.95" fill="url(#sphereGrad)"/>
+            <circle cx="51.35"  cy="-3.67"  r="12.10" fill="url(#sphereGrad)"/>
+            <circle cx="22.88"  cy="48.32"  r="12.26" fill="url(#sphereGrad)"/>
+            <circle cx="-38.1"  cy="40.27"  r="12.41" fill="url(#sphereGrad)"/>
+            <circle cx="-53.17" cy="-21.67" r="12.57" fill="url(#sphereGrad)"/>
+            <circle cx="0.96"   cy="-59.39" r="12.73" fill="url(#sphereGrad)"/>
+          </g>
+        </svg>
+        <div class="logo-text">
+          HYPHI HUB
+          <span>BLE LIGHT CONTROL</span>
+        </div>
       </div>
-      <div class="status-right">
-        <span class="status-indicator" :class="connectedCount > 0 ? 'connected' : 'idle'">
-          {{ connectedCount > 0 ? `${connectedCount} CONNECTED` : 'NO DEVICES' }}
-        </span>
-        <button class="btn-status-scan pulse-glow" v-if="connectedCount === 0" @click="showScan = true">
+
+      <div class="header-right">
+        <div class="status-dot" :class="{ connected: connectedCount > 0 }"/>
+        <span class="status-text">{{ connectedCount > 0 ? statusName : 'NO DEVICE' }}</span>
+        <button
+          class="btn-scan"
+          :class="{ 'pulse-glow': connectedCount === 0 }"
+          @click="showScan = true"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/>
+          </svg>
           SCAN
         </button>
-        <button class="btn-status-add" v-else @click="showScan = true">+</button>
+        <button class="btn-devices" @click="drawerOpen = !drawerOpen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="4" rx="1"/>
+            <rect x="2" y="10" width="20" height="4" rx="1"/>
+            <rect x="2" y="17" width="20" height="4" rx="1"/>
+          </svg>
+          <span class="btn-label">DEVICES</span>
+          <span v-if="store.devices.length > 0" class="devices-count">{{ store.devices.length }}</span>
+        </button>
+      </div>
+
+      <!-- Hamburger (mobile) -->
+      <button id="hamburger" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12h18M3 6h18M3 18h18"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Mobile menu -->
+    <div id="mobile-menu" :class="{ open: mobileMenuOpen }">
+      <div class="mobile-menu-header">
+        <span class="mobile-menu-title">Menu</span>
+        <button class="mobile-menu-close" @click="mobileMenuOpen = false">✕</button>
+      </div>
+      <div class="mobile-status-row">
+        <div class="status-dot" :class="{ connected: connectedCount > 0 }"/>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);letter-spacing:1px;">
+          {{ connectedCount > 0 ? statusName : 'NO DEVICE' }}
+        </span>
+      </div>
+      <div class="mobile-menu-row" @click="showScan = true; mobileMenuOpen = false">
+        <span class="mobile-menu-row-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/>
+          </svg>
+        </span>
+        <div>
+          <div class="mobile-menu-row-label">Scan for Devices</div>
+          <div class="mobile-menu-row-sub">Add a new BLE device</div>
+        </div>
+      </div>
+      <div class="mobile-menu-row" @click="drawerOpen = true; mobileMenuOpen = false">
+        <span class="mobile-menu-row-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/>
+          </svg>
+        </span>
+        <div>
+          <div class="mobile-menu-row-label">
+            Devices
+            <span v-if="store.devices.length > 0" class="devices-count">{{ store.devices.length }}</span>
+          </div>
+          <div class="mobile-menu-row-sub">Manage connected devices</div>
+        </div>
       </div>
     </div>
 
@@ -88,7 +184,7 @@
           <div class="no-device-icon">⚡</div>
           <div class="no-device-msg">No device selected</div>
           <div class="no-device-sub">Scan for a device to get started</div>
-          <button class="btn-scan pulse-glow" @click="showScan = true">SCAN FOR DEVICES</button>
+          <button class="btn-scan-empty pulse-glow" @click="showScan = true">SCAN FOR DEVICES</button>
         </div>
 
         <template v-if="activeDev">
@@ -312,16 +408,26 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { useDeviceStore } from '@/stores/deviceStore'
 import ScanModal from '@/components/ScanModal.vue'
 
-const store      = useDeviceStore()
-const showScan   = ref(false)
-const drawerOpen = ref(false)
-const logOpen    = ref(false)
+const store        = useDeviceStore()
+const showScan     = ref(false)
+const drawerOpen   = ref(false)
+const logOpen      = ref(false)
 const settingsOpen = ref(false)
-const logInnerRef  = ref(null)
+const logInnerRef  = ref<HTMLElement | null>(null)
+const mobileMenuOpen = ref(false)
+const isMobile     = ref(false)
+
+// Track mobile breakpoint
+function checkMobile() { isMobile.value = window.innerWidth < 600 }
+if (typeof window !== 'undefined') {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+}
 
 const connectedCount = computed(() => store.connectedCount)
 const activeDev      = computed(() => store.activeDevice)
-const ds             = computed(() => activeDev.value?.state?.value || {})
+const ds             = computed(() => activeDev.value?.state?.value || {} as import('@/ble-protocol').DeviceState)
+const statusName     = computed(() => activeDev.value?.info.name ?? '')
 
 const speedLabel = computed(() => {
   const s = ds.value?.speed || 5000
@@ -396,6 +502,9 @@ const colorPresets = [
   --accent:   #ff6b35;
   --accent2:  #7b5cfa;
   --connected:#3dffc0;
+  --glow:     rgba(255,107,53,0.08);
+  --glow2:    rgba(123,92,250,0.08);
+  --r:        10px;
   --font-mono:'DM Mono', monospace;
   --font-disp:'Bebas Neue', sans-serif;
 }
@@ -406,36 +515,149 @@ input[type=color] { -webkit-appearance: none; width: 44px; height: 44px; border:
 input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
 input[type=color]::-webkit-color-swatch { border-radius: 50%; border: 2px solid var(--border); }
 button { cursor: pointer; }
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(20px);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 56px; height: 56px; flex-shrink: 0; }
+.logo-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px; letter-spacing: 5px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; line-height: 1;
+}
+.logo span {
+  font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px;
+  color: var(--sub); display: block; margin-top: 2px;
+  -webkit-text-fill-color: var(--sub); background: none;
+}
+.header-right { display: flex; align-items: center; gap: 16px; }
+
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); transition: all 0.6s ease; box-shadow: none;
+}
+.status-dot.connected {
+  background: var(--connected);
+  box-shadow: 0 0 12px var(--connected);
+  animation: statusPulse 3s infinite;
+}
+@keyframes statusPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.status-text {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--sub); letter-spacing: 1px; text-transform: uppercase;
+}
+
+/* Scan button */
+.btn-scan {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 20px;
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--r); color: var(--text);
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.3s; position: relative; z-index: 0;
+}
+.btn-scan:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+.btn-scan svg { width: 14px; height: 14px; }
+
+/* Spinning conic-gradient glow border */
+@property --glow-angle {
+  syntax: '<angle>'; inherits: false; initial-value: 0deg;
+}
+@keyframes borderSpin { to { --glow-angle: 360deg; } }
+.btn-scan.pulse-glow { border-color: transparent; background: var(--surface); }
+.btn-scan.pulse-glow::before {
+  content: ''; position: absolute; inset: -1px;
+  border-radius: calc(var(--r) + 1px);
+  background: conic-gradient(
+    from var(--glow-angle),
+    var(--accent2) 0%, var(--accent) 25%,
+    transparent 40%, transparent 60%,
+    var(--accent) 75%, var(--accent2) 100%
+  );
+  animation: borderSpin 3s linear infinite; z-index: -1;
+}
+.btn-scan.pulse-glow::after {
+  content: ''; position: absolute; inset: 1px;
+  border-radius: calc(var(--r) - 1px);
+  background: var(--surface); z-index: -1;
+}
+
+/* Devices button */
+.btn-devices {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 16px; background: transparent;
+  border: 1px solid var(--border); border-radius: var(--r);
+  color: var(--text); font-family: 'DM Mono', monospace;
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.3s;
+}
+.btn-devices:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+.devices-count {
+  background: var(--accent2); color: white;
+  font-size: 9px; font-family: 'DM Mono', monospace;
+  padding: 1px 5px; border-radius: 10px;
+  min-width: 18px; text-align: center;
+}
+
+/* Hamburger */
+#hamburger {
+  display: none;
+  background: none; border: 1px solid var(--border);
+  border-radius: var(--r); color: var(--text);
+  padding: 8px 10px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;
+}
+#hamburger:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* Mobile header */
+header.mobile .header-right { display: none; }
+header.mobile #hamburger    { display: flex; align-items: center; justify-content: center; }
+header.mobile               { padding: 12px 16px; }
+header.mobile .logo-text    { font-size: 20px; letter-spacing: 3px; }
+header.mobile .logo-icon    { width: 42px; height: 42px; }
+
+/* Mobile menu */
+#mobile-menu {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: rgba(10,10,15,0.97); backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  z-index: 500;
+  transform: translateY(-110%); transition: transform 0.42s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: none;
+}
+#mobile-menu.open { transform: translateY(0); pointer-events: all; }
+.mobile-menu-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+}
+.mobile-menu-title { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--sub); }
+.mobile-menu-close { background: none; border: none; color: var(--sub); font-size: 18px; cursor: pointer; }
+.mobile-status-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.mobile-menu-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 10px;
+  border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.22s;
+}
+.mobile-menu-row:hover { border-color: var(--accent2); }
+.mobile-menu-row-icon  { color: var(--accent2); flex-shrink: 0; }
+.mobile-menu-row-label { font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 2px; color: var(--text); }
+.mobile-menu-row-sub   { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 2px; }
 </style>
 
 <style scoped>
 .app-shell { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
-
-/* Status bar */
-.status-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; border-bottom: 1px solid var(--border);
-  background: var(--surface); flex-shrink: 0;
-}
-.status-left   { display: flex; align-items: center; gap: 8px; }
-.app-logo      { display: flex; align-items: center; }
-.app-name      { font-family: var(--font-disp); font-size: 18px; letter-spacing: 3px; color: var(--text); }
-.status-right  { display: flex; align-items: center; gap: 8px; }
-.status-indicator {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px;
-  padding: 3px 8px; border-radius: 20px; border: 1px solid var(--muted); color: var(--sub);
-}
-.status-indicator.connected { border-color: var(--connected); color: var(--connected); }
-.btn-status-scan, .btn-status-add {
-  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--accent2);
-  background: transparent; color: var(--accent2);
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px;
-}
-.pulse-glow { animation: pulse 2s ease-in-out infinite; }
-@keyframes pulse {
-  0%,100% { box-shadow: 0 0 4px var(--accent2); }
-  50%      { box-shadow: 0 0 14px var(--accent2); }
-}
 
 /* Main layout */
 .main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
@@ -503,11 +725,11 @@ button { cursor: pointer; }
 .no-device-icon { font-size: 48px; opacity: .3; }
 .no-device-msg  { font-family: var(--font-disp); font-size: 22px; letter-spacing: 2px; color: var(--sub); }
 .no-device-sub  { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; }
-.btn-scan {
+.btn-scan-empty {
   padding: 10px 24px; border-radius: 8px; border: 1px solid var(--accent2);
   background: transparent; color: var(--accent2);
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
-  margin-top: 8px;
+  margin-top: 8px; cursor: pointer; position: relative; z-index: 0;
 }
 
 .panel-header {

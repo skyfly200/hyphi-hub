@@ -159,16 +159,16 @@ export async function connectDevice(onLog?: LogFn): Promise<ConnectResult | null
   }
 
   // 1. Browser scan picker
+  // acceptAllDevices + optionalServices is the most reliable approach:
+  // filters with mixed services/namePrefix combos are rejected by Chrome in strict mode.
+  // The GATT discovery step after connect handles device validation.
   log('Opening browser BLE scan picker…', 'info')
   let bleDevice: BluetoothDevice
   try {
     bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: [LED_SERVICE_UUID] },
-        { namePrefix: 'Smart Sprout' },
-        { namePrefix: 'Hyphi' },
-      ],
+      acceptAllDevices: true,
       optionalServices: [
+        LED_SERVICE_UUID,
         METADATA_SERVICE_UUID,
         BATTERY_SERVICE_UUID,
         DEVICE_INFO_SERVICE_UUID,
