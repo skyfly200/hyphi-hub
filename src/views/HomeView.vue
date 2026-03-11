@@ -657,7 +657,14 @@ onUnmounted(()=>{
 })
 </script>
 
-<style scoped>
+<style>
+/* global reset applies to document root so white body margin/background won't peek through */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0a0a0f;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
 
 .app-shell{background:#0a0a0f;color:#e8e8f0;font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
@@ -858,3 +865,5 @@ input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 </style>
+
+<!-- scoped styles moved earlier; no additional changes needed -->
