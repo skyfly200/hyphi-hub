@@ -336,5 +336,6 @@ export const useDeviceStore = defineStore('devices', () => {
     setCycleTime,
     setAudioReactive,
     setDamping,
+    _addDevicePublic: _addDevice,
   }
 })

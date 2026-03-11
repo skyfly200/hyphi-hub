@@ -141,13 +141,21 @@ async function startBLEScan() {
   connecting.value = true
   bleStatusText.value = 'Opening device picker…'
   try {
-    await store.connectBLE()
-    emit('update:modelValue', false)
-  } catch(e) {
-    bleStatusText.value = `Error: ${e.message}`
+    // Call connectDevice directly here — NOT through the store — so
+    // requestDevice fires in the same microtask as the click event.
+    // Going via store.connectBLE() adds an extra async hop that causes
+    // Chrome to lose the user-gesture context and block Bluetooth permission.
+    const result = await connectDevice((msg, type) => store.log(msg, type))
+    if (result) {
+      store._addDevicePublic(result)
+      emit('update:modelValue', false)
+    } else {
+      bleStatusText.value = 'Scan cancelled'
+    }
+  } catch (e: unknown) {
+    bleStatusText.value = `Error: ${(e as Error).message}`
   } finally {
     connecting.value = false
-    bleStatusText.value = 'Click SCAN to open device picker'
   }
 }
 
@@ -189,7 +197,7 @@ function addMockDevice() {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.75);
   backdrop-filter: blur(6px);
-  display: flex; align-items: flex-end; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   z-index: 1000;
   opacity: 0; pointer-events: none;
   transition: opacity .3s;
