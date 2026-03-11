@@ -1,0 +1,4350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0a0f">
+<title>Hyphi Hub — BLE Light Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #111118;
+    --panel:     #16161f;
+    --border:    #2a2a3a;
+    --muted:     #3a3a50;
+    --text:      #e8e8f0;
+    --sub:       #7a7a9a;
+    --accent:    #ff6b35;
+    --accent2:   #7b5cfa;
+    --glow:      rgba(255,107,53,0.18);
+    --glow2:     rgba(123,92,250,0.15);
+    --connected: #3dffc0;
+    --r: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(20px);
+    gap: 12px;
+  }
+
+  /* ── HAMBURGER MENU ── */
+  #hamburger {
+    display: none;
+    background: none; border: 1px solid var(--border);
+    border-radius: var(--r); color: var(--text);
+    padding: 8px 10px; cursor: pointer; transition: all 0.3s;
+    flex-shrink: 0;
+  }
+  #hamburger:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  #mobile-menu {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: rgba(10,10,15,0.97);
+    backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 500;
+    transform: translateY(-110%);
+    transition: transform 0.42s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+  }
+  #mobile-menu.open { transform: translateY(0); pointer-events: all; }
+
+  .mobile-menu-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  }
+  .mobile-menu-title {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 3px; color: var(--sub); text-transform: uppercase;
+  }
+  .mobile-menu-close {
+    background: none; border: none; color: var(--sub);
+    font-size: 18px; cursor: pointer; padding: 2px 6px; transition: color 0.3s;
+  }
+  .mobile-menu-close:hover { color: var(--text); }
+
+  .mobile-menu-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 10px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.22s;
+  }
+  .mobile-menu-row:hover { border-color: var(--accent2); }
+  .mobile-menu-row-icon { color: var(--accent2); flex-shrink: 0; }
+  .mobile-menu-row-label {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    letter-spacing: 2px; color: var(--text); text-transform: uppercase;
+  }
+  .mobile-menu-row-sub {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--muted); letter-spacing: 1px; margin-top: 2px;
+  }
+  .mobile-status-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  }
+
+  /* ── SCAN BUTTON GLOW (no device connected) ── */
+  @property --glow-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes borderSpin {
+    to { --glow-angle: 360deg; }
+  }
+  .btn-scan.pulse-glow {
+    border-color: transparent;
+    background: var(--surface);
+    position: relative;
+  }
+  .btn-scan.pulse-glow::before {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: calc(var(--r) + 1px);
+    background: conic-gradient(
+      from var(--glow-angle),
+      var(--accent2) 0%,
+      var(--accent) 25%,
+      transparent 40%,
+      transparent 60%,
+      var(--accent) 75%,
+      var(--accent2) 100%
+    );
+    animation: borderSpin 3s linear infinite;
+    z-index: -1;
+  }
+  .btn-scan.pulse-glow::after {
+    content: '';
+    position: absolute; inset: 1px;
+    border-radius: calc(var(--r) - 1px);
+    background: var(--surface);
+    z-index: -1;
+  }
+
+  /* JS-driven responsive — applied via class on <header> */
+  header.mobile .header-right { display: none; }
+  header.mobile #hamburger { display: flex; align-items: center; justify-content: center; }
+  header.mobile { padding: 12px 16px; }
+  header.mobile .logo-text { font-size: 20px; letter-spacing: 3px; }
+  header.mobile .logo-icon { width: 42px; height: 42px; }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 56px; height: 56px; flex-shrink: 0;
+  }
+  .logo-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+  }
+  .logo span { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--sub); display: block; margin-top: 2px; -webkit-text-fill-color: var(--sub); background: none; }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.6s ease;
+    box-shadow: none;
+  }
+  .status-dot.connected {
+    background: var(--connected);
+    box-shadow: 0 0 12px var(--connected);
+    animation: pulse 3s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  #status-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--sub);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .btn-scan {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .btn-scan:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--glow);
+  }
+  .btn-scan svg { width: 14px; height: 14px; }
+
+  /* ── LAYOUT ── */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* ── DEVICES SECTION ── */
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  #devices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .device-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.38s;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .device-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.38s;
+  }
+  .device-card:hover { border-color: var(--muted); transform: translateY(-1px); }
+  .device-card.active { border-color: var(--accent2); }
+  .device-card.active::before { opacity: 1; }
+
+  .device-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .device-id {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--sub);
+    letter-spacing: 1px;
+  }
+  .device-badge {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(123,92,250,0.2);
+    color: var(--accent2);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .device-color-preview {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* No devices placeholder */
+  .empty-state {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 48px 24px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    gap: 12px;
+    color: var(--sub);
+  }
+  .empty-state svg { opacity: 0.3; }
+  .empty-state p { font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── CONTROL PANEL ── */
+  #control-panel {
+    display: none;
+    animation: fadeUp 0.45s ease;
+  }
+  #control-panel.visible { display: block; }
+  #no-device-state { display: flex; align-items: center; justify-content: center; min-height: 55vh; }
+  #no-device-state.hidden { display: none; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .panel-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--text);
+  }
+  .panel-subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--sub);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* Master power */
+  .power-toggle {
+    width: 52px; height: 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    position: relative; cursor: pointer;
+    transition: all 0.45s;
+    flex-shrink: 0;
+  }
+  .power-toggle.on {
+    background: rgba(61,255,192,0.15);
+    border-color: var(--connected);
+    box-shadow: 0 0 16px rgba(61,255,192,0.2);
+  }
+  .power-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.45s;
+  }
+  .power-toggle.on::after {
+    left: 27px;
+    background: var(--connected);
+  }
+
+  /* Controls grid */
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 600px) { .controls-grid { grid-template-columns: 1fr; } }
+
+  .control-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .control-block.full { grid-column: 1 / -1; }
+
+  .control-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .control-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* Color picker */
+  .color-ring {
+    width: 100%;
+    aspect-ratio: 1;
+    max-width: 180px;
+    margin: 0 auto;
+    display: block;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+    outline: none;
+  }
+  /* Native color input styled */
+  .color-slot-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 7px;
+    border: 1px solid var(--border);
+    background: transparent; color: var(--sub);
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 1px;
+    transition: all 0.18s; flex: 1; justify-content: center;
+  }
+  .color-slot-tab:hover { border-color: var(--muted); color: var(--text); }
+  .color-slot-tab.active {
+    border-color: var(--slot-color, var(--accent));
+    color: var(--text);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--slot-color, var(--accent)) 40%, transparent);
+    background: color-mix(in srgb, var(--slot-color, var(--accent)) 10%, transparent);
+  }
+  .slot-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--slot-color, var(--accent));
+    flex-shrink: 0;
+    box-shadow: 0 0 5px var(--slot-color, var(--accent));
+  }
+  .slot-lbl { font-size: 10px; }
+
+  /* Color picker — compact horizontal layout */
+  input[type="color"] {
+    -webkit-appearance: none; appearance: none;
+    width: 52px; height: 52px;
+    border: 2px solid var(--border); border-radius: 50%;
+    padding: 3px; background: var(--panel);
+    cursor: pointer; display: block; flex-shrink: 0;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; overflow: hidden; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+  input[type="color"]:hover { border-color: var(--accent); box-shadow: 0 0 10px rgba(255,107,53,0.35); }
+
+  .color-picker-row {
+    display: flex; align-items: flex-start; gap: 12px; margin-top: 10px;
+  }
+
+  /* Color presets */
+  .color-presets {
+    display: flex; gap: 8px; flex-wrap: wrap; flex: 1;
+    align-content: flex-start;
+  }
+  .preset-swatch {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer; transition: all 0.18s; flex-shrink: 0; position: relative;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.15);
+  }
+  .preset-swatch:hover {
+    transform: scale(1.25);
+    box-shadow: 0 0 8px var(--swatch-color, rgba(255,255,255,0.5)), inset 0 1px 2px rgba(255,255,255,0.2);
+  }
+  .preset-swatch.selected {
+    border-color: white;
+    transform: scale(1.2);
+    box-shadow: 0 0 10px var(--swatch-color, rgba(255,255,255,0.6)), inset 0 1px 2px rgba(255,255,255,0.2);
+  }
+  .preset-swatch.custom { border-style: dashed; border-color: rgba(255,255,255,0.25); }
+  .preset-swatch.custom:hover { border-color: rgba(255,255,255,0.6); }
+  .preset-swatch .del-x {
+    display: none; position: absolute; top: -4px; right: -4px;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: #ff3355; color: white; font-size: 9px; line-height: 13px;
+    text-align: center; cursor: pointer; z-index: 2;
+  }
+  .preset-swatch.custom:hover .del-x { display: block; }
+  .preset-save-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px dashed rgba(255,255,255,0.25);
+    background: transparent; color: rgba(255,255,255,0.4);
+    cursor: pointer; font-size: 16px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s; flex-shrink: 0;
+  }
+  .preset-save-btn:hover { border-color: rgba(255,255,255,0.7); color: white; transform: scale(1.2); }
+
+  /* Sliders */
+  .slider-wrap { position: relative; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    background: var(--panel);
+    border: 1px solid var(--border);
+  }
+  input[type="range"].brightness-slider {
+    background: linear-gradient(90deg, #1a1a2e, #ffffff);
+  }
+  input[type="range"].speed-slider {
+    background: linear-gradient(90deg, #1a1a2e, var(--accent2));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--text);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transition: transform 0.22s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--text);
+    border: 2px solid var(--bg);
+    cursor: pointer;
+  }
+
+  /* Effect mode buttons */
+  .effect-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .effect-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: var(--sub);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .effect-btn:hover { border-color: var(--muted); color: var(--text); }
+  .effect-btn.active {
+    border-color: var(--accent);
+    background: var(--glow);
+    color: var(--accent);
+  }
+  .effect-icon { font-size: 18px; line-height: 1; }
+
+  /* Scene buttons */
+  .scene-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .scene-btn {
+    padding: 10px 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: var(--sub);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .scene-btn:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+  .scene-btn .scene-icon { font-size: 16px; display: block; margin-bottom: 4px; }
+
+  /* ── HUD ── */
+  #device-hud {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #hud-canvas-wrap {
+    position: relative;
+    height: 180px;
+    background: #07070d;
+    overflow: hidden;
+  }
+
+  #hud-canvas {
+    display: block; width: 100%; height: 100%;
+  }
+
+  /* fixture type tabs */
+
+  /* device name overlay on HUD */
+  #hud-device-label {
+    position: absolute; top: 12px; left: 16px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.15); pointer-events: none; user-select: none;
+    text-shadow: none;
+  }
+
+  #hud-3d {
+    position: absolute; inset: 0;
+    display: none;
+    pointer-events: auto;
+  }
+  #hud-3d.active { display: block; }
+  #hud-3d canvas { display: block; width: 100% !important; height: 100% !important; }
+  #hud-3d-badge {
+    position: absolute; bottom: 8px; right: 10px;
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 2px;
+    color: var(--accent2); opacity: 0.6; pointer-events: none; text-transform: uppercase;
+  }
+
+  #hud-view-toggle {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(10,10,20,0.75); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--sub);
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    padding: 4px 10px; cursor: pointer; z-index: 10;
+    transition: border-color 0.3s, color 0.3s;
+    backdrop-filter: blur(4px);
+  }
+  #hud-view-toggle:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* OFF state overlay */
+  #hud-off-label {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 4px;
+    color: var(--muted); text-transform: uppercase;
+    opacity: 0; pointer-events: none; transition: opacity 0.45s;
+  }
+  #hud-off-label.visible { opacity: 1; }
+
+  /* HUD stats bar */
+  #hud-stats {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--border);
+  }
+  .hud-stat {
+    padding: 11px 0; text-align: center;
+    border-right: 1px solid var(--border);
+    transition: background 0.3s;
+  }
+  .hud-stat:last-child { border-right: none; }
+  .hud-stat-val {
+    font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+    color: var(--text); line-height: 1;
+  }
+  .hud-stat-lbl {
+    font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 1.5px;
+    color: var(--muted); margin-top: 4px; text-transform: uppercase;
+  }
+  .hud-stat-val.hi { color: var(--connected); }
+  .hud-stat-val.warn { color: #f0c040; }
+  .hud-stat-val.crit { color: #ff5577; }
+
+  /* power gauge in stats bar */
+  .hud-gauge-wrap {
+    padding: 14px 16px 10px;
+    border-top: none;
+  }
+  .hud-gauge-track {
+    height: 3px; border-radius: 2px; background: var(--panel); overflow: hidden;
+  }
+  .hud-gauge-fill {
+    height: 100%; width: 0%; border-radius: 2px;
+    transition: width 0.75s ease, background 0.75s;
+  }
+
+  /* ── ADVANCED CONTROL BLOCKS ── */
+  .adv-block {
+    border-top: 1px solid var(--border);
+    padding-top: 18px; margin-top: 4px;
+  }
+  .adv-sub {
+    margin-top: 14px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .adv-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .adv-row-label {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--sub); letter-spacing: 1px; text-transform: uppercase;
+    white-space: nowrap; min-width: 80px;
+  }
+  .adv-row-value {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--accent2); min-width: 34px; text-align: right;
+  }
+
+  /* small inline toggle */
+  .toggle-small {
+    width: 34px; height: 18px; border-radius: 9px;
+    background: var(--muted); border: none; cursor: pointer;
+    position: relative; transition: background 0.3s; flex-shrink: 0;
+  }
+  .toggle-small::after {
+    content: ''; position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bg); transition: transform 0.3s;
+  }
+  .toggle-small.on { background: var(--connected); }
+  .toggle-small.on::after { transform: translateX(16px); }
+
+  /* stepper */
+  .stepper {
+    display: flex; align-items: center; gap: 0;
+    border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+  }
+  .stepper button {
+    background: var(--surface); border: none; color: var(--text);
+    font-size: 15px; width: 32px; height: 30px; cursor: pointer;
+    transition: background 0.22s; line-height: 1;
+  }
+  .stepper button:hover { background: var(--panel); }
+  .stepper span {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text); padding: 0 12px; min-width: 46px;
+    text-align: center; background: var(--surface); height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  }
+
+  /* cycle progress bar */
+  .cycle-bar-wrap {
+    margin-top: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; height: 4px; overflow: hidden;
+  }
+  .cycle-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 4px;
+  }
+
+  /* badge for unsupported */
+  .badge-unsupported {
+    font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 1.5px;
+    padding: 2px 7px; border-radius: 4px;
+    background: rgba(255,55,77,0.12); color: #ff5577;
+    text-transform: uppercase;
+  }
+  .badge-supported {
+    font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 1.5px;
+    padding: 2px 7px; border-radius: 4px;
+    background: rgba(61,255,192,0.1); color: var(--connected);
+    text-transform: uppercase;
+  }
+
+  /* audio mode pills */
+  .audio-mode-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .audio-mode-btn {
+    padding: 5px 12px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.22s;
+  }
+  .audio-mode-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .audio-mode-btn.active { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+
+  /* cycle body accordion */
+  #cycle-body {
+    display: grid; grid-template-rows: 0fr;
+    transition: grid-template-rows 0.38s ease, opacity 0.3s;
+    opacity: 0;
+  }
+  #cycle-body.enabled { grid-template-rows: 1fr; opacity: 1; }
+  #cycle-body > * { overflow: hidden; }
+
+  /* audio body accordion */
+  #audio-body {
+    display: grid; grid-template-rows: 0fr;
+    transition: grid-template-rows 0.38s ease, opacity 0.3s;
+    opacity: 0; pointer-events: none;
+  }
+  #audio-body.enabled { grid-template-rows: 1fr; opacity: 1; pointer-events: all; }
+  #audio-body > * { overflow: hidden; }
+  #audio-toggle:not(.on) { opacity: 0.5; }
+
+  /* power stats */
+  .power-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-top: 14px;
+  }
+  .power-stat {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 8px; text-align: center;
+  }
+  .power-stat-val {
+    font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500;
+    color: var(--text); line-height: 1.2;
+  }
+  .power-stat-lbl {
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    color: var(--muted); margin-top: 4px; text-transform: uppercase;
+  }
+  .power-gauge-wrap { margin-top: 14px; }
+  .power-gauge-track {
+    position: relative; height: 8px; border-radius: 4px;
+    background: var(--surface); border: 1px solid var(--border); overflow: hidden;
+  }
+  .power-gauge-fill {
+    height: 100%; width: 0%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--connected), #f0c040, #ff5577);
+    transition: width 0.9s ease;
+  }
+  .power-gauge-cap {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: rgba(255,255,255,0.3); right: 0;
+  }
+  .power-gauge-labels {
+    display: flex; justify-content: space-between;
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--muted); margin-top: 5px; letter-spacing: 1px;
+  }
+
+  /* ── LOG ACCORDION ── */
+  #log-accordion {
+    margin-top: 24px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  #log-toggle {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 18px;
+    background: var(--surface);
+    border: none; cursor: pointer;
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    transition: background 0.3s;
+  }
+  #log-toggle:hover { background: var(--panel); }
+  #log-toggle .log-toggle-left { display: flex; align-items: center; gap: 10px; }
+  #log-toggle .log-count {
+    background: var(--muted); color: var(--bg);
+    font-size: 9px; padding: 1px 6px; border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+  }
+  .log-chevron {
+    transition: transform 0.38s ease;
+    color: var(--muted);
+  }
+  #log-accordion.open .log-chevron { transform: rotate(180deg); }
+
+  #ble-log {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 20px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--sub);
+    line-height: 1.8;
+    /* accordion collapse */
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.42s ease;
+  }
+  #log-accordion.open #ble-log {
+    grid-template-rows: 1fr;
+  }
+  #ble-log-inner {
+    overflow: hidden;
+  }
+  #ble-log .log-entry { display: flex; gap: 12px; }
+  #ble-log .log-time  { color: var(--muted); flex-shrink: 0; }
+  #ble-log .log-ok    { color: var(--connected); }
+  #ble-log .log-err   { color: #ff5577; }
+  #ble-log .log-info  { color: var(--accent2); }
+
+  /* Settings accordion — mirrors log accordion style */
+  #settings-accordion {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  #settings-toggle {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 18px;
+    background: var(--surface);
+    border: none; cursor: pointer;
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    transition: background 0.3s;
+  }
+  #settings-toggle:hover { background: var(--panel); }
+  #settings-body {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 0 20px;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.42s ease;
+  }
+  #settings-accordion.open #settings-body { grid-template-rows: 1fr; }
+  #settings-body-inner { overflow: hidden; padding: 16px 0; }
+  #settings-accordion.open .log-chevron { transform: rotate(180deg); }
+
+  /* Color slot tab dot — shows current slot colour */
+  .color-slot-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px;
+    border: 1.5px solid transparent; background: var(--surface);
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 1px; color: var(--sub);
+    transition: all 0.18s;
+  }
+  .color-slot-tab.active { border-color: rgba(255,255,255,0.4); color: var(--text); }
+  .color-slot-tab:hover { border-color: rgba(255,255,255,0.2); }
+  .slot-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--slot-color, #888);
+    flex-shrink: 0; border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── SCAN MODAL ── */
+  #scan-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.45s;
+    padding: 16px;
+  }
+  #scan-overlay.visible { opacity: 1; }
+
+  #scan-modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%; max-width: 440px;
+    overflow: hidden;
+    transform: translateY(16px);
+    transition: transform 0.45s;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+  }
+  #scan-overlay.visible #scan-modal { transform: translateY(0); }
+
+  .scan-modal-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 24px 24px 0;
+  }
+  .scan-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; letter-spacing: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .scan-modal-sub {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--sub); letter-spacing: 1px; margin-top: 4px;
+  }
+  .scan-close {
+    background: none; border: none; color: var(--sub);
+    font-size: 16px; cursor: pointer; padding: 4px 8px;
+    transition: color 0.3s;
+  }
+  .scan-close:hover { color: var(--text); }
+
+  /* Radar animation */
+  .scan-wave-wrap {
+    position: relative; width: 100px; height: 100px;
+    margin: 24px auto 16px;
+  }
+  .scan-wave {
+    position: absolute; inset: 0;
+    border: 1.5px solid var(--accent2);
+    border-radius: 50%;
+    opacity: 0;
+    animation: radar 3s ease-out infinite;
+  }
+  @keyframes radar {
+    0%   { transform: scale(0.2); opacity: 0.8; }
+    100% { transform: scale(1);   opacity: 0; }
+  }
+  .scan-center-dot {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 10px; height: 10px;
+    background: var(--accent2);
+    border-radius: 50%;
+    box-shadow: 0 0 16px var(--accent2);
+  }
+
+  .scan-results { padding: 0 16px; height: 180px; overflow-y: auto; }
+
+  .scan-device-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.45s ease;
+    gap: 12px;
+  }
+  .scan-device-row:last-child { border-bottom: none; }
+  .scan-dev-name {
+    font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+    color: var(--text); margin-bottom: 3px;
+  }
+  .scan-dev-meta {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--sub);
+    letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
+  }
+  .btn-connect-device {
+    flex-shrink: 0;
+    padding: 7px 16px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; cursor: pointer;
+    transition: all 0.3s;
+  }
+  .btn-connect-device:hover:not(:disabled) {
+    background: var(--glow);
+  }
+  .btn-connect-device:disabled { opacity: 0.5; cursor: default; }
+
+  .scan-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  /* ── SCAN METHOD TABS ── */
+  .scan-method-tabs {
+    display: flex; gap: 0; margin: 16px 24px 0;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .scan-method-tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 8px; background: var(--surface); border: none;
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s; border-right: 1px solid var(--border);
+  }
+  .scan-method-tab:last-child { border-right: none; }
+  .scan-method-tab:hover { color: var(--text); background: var(--panel); }
+  .scan-method-tab.active { color: var(--accent2); background: var(--glow2); }
+
+  .scan-panel { padding-bottom: 4px; }
+
+  /* QR viewfinder */
+  .qr-viewfinder-wrap {
+    padding: 20px 24px 0; display: flex; justify-content: center;
+  }
+  .qr-viewfinder {
+    position: relative; width: 180px; height: 160px;
+    background: rgba(0,0,0,0.35); border-radius: 8px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  }
+  .qr-corner {
+    position: absolute; width: 20px; height: 20px;
+    border-color: var(--accent2); border-style: solid;
+  }
+  .qr-corner.tl { top:8px; left:8px;  border-width: 2px 0 0 2px; }
+  .qr-corner.tr { top:8px; right:8px; border-width: 2px 2px 0 0; }
+  .qr-corner.bl { bottom:8px; left:8px;  border-width: 0 0 2px 2px; }
+  .qr-corner.br { bottom:8px; right:8px; border-width: 0 2px 2px 0; }
+  .qr-scan-line {
+    position: absolute; left: 8px; right: 8px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    top: 20px; opacity: 0;
+  }
+  .qr-scan-line.active {
+    opacity: 1; animation: qrScan 2.1s ease-in-out forwards;
+  }
+  @keyframes qrScan {
+    0%   { top: 20px; }
+    100% { top: calc(100% - 20px); }
+  }
+  .qr-placeholder-icon { color: var(--muted); opacity: 0.4; }
+  .qr-hint {
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    color: var(--sub); text-align: center; padding: 0 12px;
+  }
+
+  /* NFC rings */
+  .nfc-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 24px 8px; gap: 16px;
+  }
+  .nfc-rings {
+    position: relative; width: 180px; height: 180px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nfc-ring {
+    position: absolute; border-radius: 50%;
+    border: 1.5px solid var(--accent2); opacity: 0;
+    animation: nfcPulse 3s ease-out infinite;
+  }
+  .nfc-ring.r1 { width:70px;  height:70px;  animation-delay: 0s;    }
+  .nfc-ring.r2 { width:120px; height:120px; animation-delay: 0.6s;  }
+  .nfc-ring.r3 { width:170px; height:170px; animation-delay: 1.2s;  }
+  @keyframes nfcPulse {
+    0%   { transform: scale(0.7); opacity: 0.8; }
+    100% { transform: scale(1);   opacity: 0; }
+  }
+  .nfc-ring.tap { animation: nfcTap 0.45s ease forwards; }
+  @keyframes nfcTap {
+    0%   { opacity: 1; transform: scale(0.8); }
+    50%  { opacity: 1; transform: scale(1.1); border-color: var(--connected); }
+    100% { opacity: 0; transform: scale(1.3); }
+  }
+  .nfc-phone {
+    color: var(--accent2); z-index: 1;
+  }
+  .nfc-label {
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    color: var(--sub); text-align: center;
+  }
+
+  .btn-scan-action {
+    display: flex; align-items: center; gap: 7px; margin: 0 auto;
+    padding: 9px 20px; background: transparent;
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+  }
+  .btn-scan-action:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+
+  .badge-live {
+    font-size: 9px; padding: 2px 7px; border-radius: 4px;
+    background: rgba(61,255,192,0.15); color: var(--connected);
+    letter-spacing: 1px; text-transform: uppercase; flex-shrink: 0;
+  }
+  .badge-off {
+    font-size: 9px; padding: 2px 7px; border-radius: 4px;
+    background: rgba(255,255,255,0.05); color: var(--muted);
+    letter-spacing: 1px; text-transform: uppercase; flex-shrink: 0;
+  }
+  .device-card.disconnected { opacity: 0.55; }
+  .device-card.disconnected:hover { opacity: 0.75; }
+  .btn-reconnect {
+    display: flex; align-items: center; gap: 5px;
+    background: none;
+    border: 1px solid var(--muted);
+    color: var(--sub);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 5px 9px; border-radius: 5px;
+    cursor: pointer; transition: all 0.3s;
+    flex-shrink: 0;
+  }
+  .btn-reconnect:hover:not(:disabled) { border-color: var(--connected); color: var(--connected); background: rgba(61,255,192,0.07); }
+  .btn-reconnect:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── BATTERY ── */
+  .battery-wrap {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--sub); letter-spacing: 1px; flex-shrink: 0;
+  }
+  .battery-icon {
+    position: relative; display: inline-flex; align-items: center;
+    width: 20px; height: 11px;
+  }
+  .battery-icon .batt-body {
+    width: 17px; height: 11px; border: 1.5px solid currentColor;
+    border-radius: 2px; overflow: hidden; position: relative;
+  }
+  .battery-icon .batt-tip {
+    width: 2px; height: 5px; background: currentColor;
+    border-radius: 0 1px 1px 0; margin-left: 1px; flex-shrink: 0;
+  }
+  .battery-icon .batt-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    border-radius: 1px; transition: width 0.6s ease;
+  }
+  .batt-high  { color: var(--connected); }
+  .batt-med   { color: #f0c040; }
+  .batt-low   { color: #ff5577; }
+
+  /* battery in panel header */
+  .panel-battery {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--sub); margin-top: 4px;
+  }
+
+  /* ── FX EDIT BUTTON ── */
+  .btn-edit-effects {
+    display: flex; align-items: center; gap: 5px;
+    background: none; border: 1px solid var(--border);
+    color: var(--sub); font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    transition: all 0.3s;
+  }
+  .btn-edit-effects:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── FX DRAWER ── */
+  #fx-drawer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0);
+    z-index: 200; pointer-events: none; transition: background 0.45s;
+  }
+  #fx-drawer-overlay.open { background: rgba(0,0,0,0.55); pointer-events: all; backdrop-filter: blur(4px); }
+
+  #fx-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 340px; max-width: 92vw;
+    background: var(--panel); border-left: 1px solid var(--border);
+    z-index: 201; display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.48s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: -24px 0 60px rgba(0,0,0,0.5);
+  }
+  #fx-drawer.open { transform: translateX(0); }
+
+  /* FX list items */
+  .fx-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px;
+    cursor: default;
+    transition: border-color 0.3s;
+  }
+  .fx-item.drag-over { border-color: var(--accent2); background: rgba(123,92,250,0.07); }
+  .fx-item.dragging  { opacity: 0.35; border-style: dashed; }
+
+  .fx-item-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+  .fx-item-name {
+    flex: 1; font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text); letter-spacing: 0.5px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .fx-item-mode {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 1px; flex-shrink: 0;
+  }
+  .fx-drag-handle {
+    color: var(--muted); cursor: grab; padding: 2px 4px;
+    flex-shrink: 0; display: flex; align-items: center;
+  }
+  .fx-drag-handle:active { cursor: grabbing; }
+  .btn-fx-delete {
+    background: none; border: 1px solid rgba(255,55,77,0.35);
+    color: #ff374d; width: 24px; height: 24px; border-radius: 4px;
+    cursor: pointer; transition: background 0.22s;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 11px;
+  }
+  .btn-fx-delete:hover { background: rgba(255,55,77,0.15); }
+
+  /* Add row */
+  .fx-add-label {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 3px; color: var(--sub); text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .fx-add-row { display: flex; gap: 8px; align-items: stretch; }
+  .fx-select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 11px; padding: 8px 10px; cursor: pointer;
+    appearance: none; -webkit-appearance: none; outline: none;
+    transition: border-color 0.3s;
+  }
+  .fx-select:focus { border-color: var(--accent2); }
+  .btn-fx-add {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; background: transparent;
+    border: 1px solid var(--accent); border-radius: 7px;
+    color: var(--accent); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap; transition: all 0.3s; flex-shrink: 0;
+  }
+  .btn-fx-add:hover { background: var(--glow); }
+  .fx-icon-btn {
+    width: 34px; height: 34px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; font-size: 18px; display: flex;
+    align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .fx-icon-btn:hover { border-color: var(--accent2); background: rgba(123,92,250,0.1); }
+  .fx-icon-btn.selected { border-color: var(--accent2); background: rgba(123,92,250,0.2); }
+  .btn-edit {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--sub);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 5px 12px; border-radius: 5px;
+    cursor: pointer; transition: all 0.3s;
+  }
+  .btn-edit:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-edit.active { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+
+  .btn-delete {
+    background: none;
+    border: 1px solid rgba(255,55,77,0.4);
+    color: #ff374d;
+    width: 26px; height: 26px; border-radius: 5px;
+    cursor: pointer; transition: background 0.22s;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 12px;
+  }
+  .btn-delete:hover { background: rgba(255,55,77,0.15); }
+
+  .drag-handle {
+    color: var(--muted);
+    cursor: grab; padding: 4px 8px 4px 2px;
+    display: flex; align-items: center;
+    flex-shrink: 0; touch-action: none;
+    opacity: 0; transition: opacity 0.22s;
+  }
+  #devices-drawer.editing .drag-handle { opacity: 1; }
+  .drag-handle:active { cursor: grabbing; }
+
+  .device-card { transition: opacity 0.3s, border-color 0.3s, background 0.3s, transform 0.22s; }
+  .device-card.dragging { opacity: 0.35; border-style: dashed; }
+  .device-card.drag-over { border-color: var(--accent2); background: rgba(123,92,250,0.07); }
+
+  /* ── DEVICES DRAWER ── */
+  #drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 200;
+    pointer-events: none;
+    transition: background 0.45s;
+  }
+  #drawer-overlay.open {
+    background: rgba(0,0,0,0.55);
+    pointer-events: all;
+    backdrop-filter: blur(4px);
+  }
+
+  #devices-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 320px; max-width: 90vw;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    z-index: 201;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.48s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -24px 0 60px rgba(0,0,0,0.5);
+  }
+  #devices-drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .drawer-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px; letter-spacing: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .drawer-sub {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--sub); letter-spacing: 1px; margin-top: 4px;
+  }
+  .drawer-close {
+    background: none; border: none; color: var(--sub);
+    cursor: pointer; padding: 4px; transition: color 0.3s;
+    margin-top: 2px;
+  }
+  .drawer-close:hover { color: var(--text); }
+
+  #devices-grid {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  /* Override old grid layout — drawer uses column stack */
+  .drawer-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .btn-scan-drawer {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+  }
+  .btn-scan-drawer:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+
+  /* Devices button in header */
+  .btn-devices {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+  }
+  .btn-devices:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+  .devices-count {
+    background: var(--accent2);
+    color: white;
+    font-size: 9px; font-family: 'DM Mono', monospace;
+    padding: 1px 5px; border-radius: 10px;
+    min-width: 18px; text-align: center;
+  }
+
+  /* No device selected state */
+  .no-device-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    text-align: center;
+  }
+  .no-device-icon { color: var(--muted); opacity: 0.3; }
+  .no-device-msg {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; letter-spacing: 4px; color: var(--sub);
+  }
+  .no-device-sub {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 1px; max-width: 260px; line-height: 1.7;
+  }
+  .no-device-scan { margin-top: 8px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0;
+    transition: all 0.45s;
+    pointer-events: none;
+    z-index: 9000;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Bluetooth icon animation */
+  .scanning .scan-icon { animation: spin 1.5s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Separator dot */
+  .dot-sep { color: var(--muted); margin: 0 4px; }
+
+  /* Brightness display bar */
+  .brightness-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, white);
+    margin-top: 10px;
+    border: 1px solid var(--border);
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<!-- ── DEVICES DRAWER ───────────────────────────────────────────── -->
+<div id="drawer-overlay" onclick="closeDrawer()"></div>
+<div id="devices-drawer">
+  <div class="drawer-header">
+    <div>
+      <div class="drawer-title">DEVICES</div>
+      <div class="drawer-sub" id="drawer-sub">No devices connected</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="btn-edit" id="btn-edit" onclick="toggleEditMode()">EDIT</button>
+      <button class="drawer-close" onclick="closeDrawer()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="devices-grid">
+    <div class="empty-state">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
+      <p>Scan to discover devices</p>
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn-scan-drawer" onclick="closeDrawer(); setTimeout(scanForDevices, 200)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
+      ADD DEVICE
+    </button>
+  </div>
+</div>
+
+<!-- ── FX EDITOR DRAWER ──────────────────────────────────────────── -->
+<div id="fx-drawer-overlay" onclick="closeFxDrawer()"></div>
+<div id="fx-drawer">
+  <div class="drawer-header">
+    <div>
+      <div class="drawer-title">EFFECTS</div>
+      <div class="drawer-sub">Customize your effect buttons</div>
+    </div>
+    <button class="drawer-close" onclick="closeFxDrawer()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="fx-list" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+  <div style="border-top:1px solid var(--border);padding:16px;flex-shrink:0;">
+    <div class="fx-add-label">ADD EFFECT</div>
+    <div class="fx-add-row" style="margin-bottom:8px;">
+      <div style="flex:1;">
+        <select id="fx-select-effect" class="fx-select"></select>
+      </div>
+      <button class="btn-fx-add" onclick="addFxSlot()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        ADD
+      </button>
+    </div>
+    <div class="fx-add-label" style="margin-top:10px;">ICON</div>
+    <input id="fx-icon-search" class="fx-select" placeholder="Search icons…" oninput="renderIconGrid(this.value)"
+           style="margin-bottom:8px;">
+    <div id="fx-icon-grid" style="display:flex;flex-wrap:wrap;gap:6px;max-height:96px;overflow-y:auto;padding:4px 0;"></div>
+    <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">
+      Selected: <span id="fx-icon-selected" style="font-size:18px;vertical-align:middle;">✦</span>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="-82 -82 164 164">
+      <defs>
+        <radialGradient id="sphereGrad" cx="38%" cy="35%" r="60%">
+          <stop offset="0%"   stop-color="#e080ff"/>
+          <stop offset="45%"  stop-color="#800080"/>
+          <stop offset="100%" stop-color="#2d003d"/>
+        </radialGradient>
+        <radialGradient id="glowBg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#4b0082" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#0a000f" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#cc00ff" flood-opacity="0.35"/>
+        </filter>
+      </defs>
+      <circle cx="0" cy="0" r="74" fill="url(#glowBg)"/>
+      <g filter="url(#softShadow)">
+        <circle cx="0.44"   cy="1.93"   r="8.21"  fill="url(#sphereGrad)"/>
+        <circle cx="-3.28"  cy="2.22"   r="8.37"  fill="url(#sphereGrad)"/>
+        <circle cx="-4.89"  cy="-3.37"  r="8.52"  fill="url(#sphereGrad)"/>
+        <circle cx="1.83"   cy="-7.71"  r="8.68"  fill="url(#sphereGrad)"/>
+        <circle cx="9.81"   cy="-1.36"  r="8.83"  fill="url(#sphereGrad)"/>
+        <circle cx="5.79"   cy="10.37"  r="8.99"  fill="url(#sphereGrad)"/>
+        <circle cx="-8.83"  cy="10.68"  r="9.14"  fill="url(#sphereGrad)"/>
+        <circle cx="-15.04" cy="-4.98"  r="9.30"  fill="url(#sphereGrad)"/>
+        <circle cx="-0.9"   cy="-17.8"  r="9.46"  fill="url(#sphereGrad)"/>
+        <circle cx="18.07"  cy="-8.1"   r="9.61"  fill="url(#sphereGrad)"/>
+        <circle cx="15.51"  cy="15.29"  r="9.77"  fill="url(#sphereGrad)"/>
+        <circle cx="-9.42"  cy="21.81"  r="9.92"  fill="url(#sphereGrad)"/>
+        <circle cx="-25.72" cy="-0.95"  r="10.08" fill="url(#sphereGrad)"/>
+        <circle cx="-9.09"  cy="-26.19" r="10.23" fill="url(#sphereGrad)"/>
+        <circle cx="22.62"  cy="-19.24" r="10.39" fill="url(#sphereGrad)"/>
+        <circle cx="27.88"  cy="15.05"  r="10.55" fill="url(#sphereGrad)"/>
+        <circle cx="-4.17"  cy="33.4"   r="10.70" fill="url(#sphereGrad)"/>
+        <circle cx="-34.56" cy="8.7"    r="10.86" fill="url(#sphereGrad)"/>
+        <circle cx="-21.78" cy="-30.68" r="11.01" fill="url(#sphereGrad)"/>
+        <circle cx="21.79"  cy="-33.07" r="11.17" fill="url(#sphereGrad)"/>
+        <circle cx="40.65"  cy="8.74"   r="11.32" fill="url(#sphereGrad)"/>
+        <circle cx="6.89"   cy="43.01"  r="11.48" fill="url(#sphereGrad)"/>
+        <circle cx="-39.3"  cy="23.01"  r="11.64" fill="url(#sphereGrad)"/>
+        <circle cx="-37.24" cy="-29.52" r="11.79" fill="url(#sphereGrad)"/>
+        <circle cx="14.6"   cy="-47.3"  r="11.95" fill="url(#sphereGrad)"/>
+        <circle cx="51.35"  cy="-3.67"  r="12.10" fill="url(#sphereGrad)"/>
+        <circle cx="22.88"  cy="48.32"  r="12.26" fill="url(#sphereGrad)"/>
+        <circle cx="-38.1"  cy="40.27"  r="12.41" fill="url(#sphereGrad)"/>
+        <circle cx="-53.17" cy="-21.67" r="12.57" fill="url(#sphereGrad)"/>
+        <circle cx="0.96"   cy="-59.39" r="12.73" fill="url(#sphereGrad)"/>
+      </g>
+    </svg>
+    <div class="logo-text">
+      HYPHI HUB
+      <span>BLE LIGHT CONTROL</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">NO DEVICE</span>
+    <button class="btn-devices" id="btn-devices" onclick="openDrawer()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
+      <span class="btn-label">DEVICES</span>
+      <span class="devices-count" id="devices-count" style="display:none">0</span>
+    </button>
+  </div>
+  <button id="hamburger" onclick="toggleMobileMenu()" aria-label="Menu">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 12h18M3 6h18M3 18h18"/>
+    </svg>
+  </button>
+</header>
+
+<!-- ── MOBILE MENU ─────────────────────────────────────────────────── -->
+<div id="mobile-menu">
+  <div class="mobile-menu-header">
+    <span class="mobile-menu-title">Menu</span>
+    <button class="mobile-menu-close" onclick="toggleMobileMenu()">✕</button>
+  </div>
+  <div class="mobile-status-row">
+    <div class="status-dot" id="mobile-status-dot"></div>
+    <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);letter-spacing:1px;" id="mobile-status-text">NO DEVICE</span>
+  </div>
+  <div class="mobile-menu-row" onclick="toggleMobileMenu(); openDrawer()">
+    <div class="mobile-menu-row-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
+    </div>
+    <div>
+      <div class="mobile-menu-row-label">Devices <span class="devices-count" id="mobile-devices-count" style="display:none">0</span></div>
+      <div class="mobile-menu-row-sub">Manage connected lights</div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- CONTROLS -->
+  <div id="control-panel">
+    <!-- HUD -->
+    <div id="device-hud">
+      <div id="hud-canvas-wrap">
+        <canvas id="hud-canvas"></canvas>
+        <div id="hud-3d"></div>
+        <div id="hud-device-label"></div>
+        <div id="hud-off-label">POWER OFF</div>
+        <button id="hud-view-toggle" onclick="toggleHudView()" style="display:none">2D</button>
+
+
+      </div>
+      <div id="hud-stats">
+        <div class="hud-stat">
+          <div class="hud-stat-val" id="hstat-leds">—</div>
+          <div class="hud-stat-lbl">LEDs lit</div>
+        </div>
+        <div class="hud-stat">
+          <div class="hud-stat-val" id="hstat-ma">—</div>
+          <div class="hud-stat-lbl">mA</div>
+        </div>
+        <div class="hud-stat">
+          <div class="hud-stat-val" id="hstat-w">—</div>
+          <div class="hud-stat-lbl">Watts</div>
+        </div>
+        <div class="hud-stat" id="hstat-batt-wrap" style="display:none;">
+          <div class="hud-stat-val" id="hstat-batt-time">—</div>
+          <div class="hud-stat-lbl">Remaining</div>
+        </div>
+        <div class="hud-stat" style="padding:10px 14px;">
+          <div class="hud-gauge-track" style="margin-top:6px;">
+            <div class="hud-gauge-fill" id="hud-gauge-fill"></div>
+          </div>
+          <div class="hud-stat-lbl" style="margin-top:5px;text-align:left;" id="hstat-max">— W max</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="active-device-name">—</div>
+        <div class="panel-subtitle" id="active-device-id">—</div>
+        <div class="panel-battery" id="panel-battery" style="display:none"></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;">POWER</span>
+        <div class="power-toggle" id="power-toggle" onclick="togglePower()"></div>
+      </div>
+    </div>
+
+    <div id="controls-body">
+    <div class="controls-grid">
+
+      <!-- COLOR PICKER -->
+      <div class="control-block">
+        <div class="control-label">
+          Color
+          <span class="control-value" id="color-hex">#FF6B35</span>
+        </div>
+        <div class="color-picker-row">
+          <input type="color" id="color-picker" value="#ff6b35" oninput="onActiveColorChange(this.value)">
+          <div class="color-presets" id="color-presets"></div>
+        </div>
+        <div id="color-tab-bar" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:10px;"></div>
+      </div>
+
+      <!-- BRIGHTNESS + SPEED -->
+      <div class="control-block">
+        <div class="control-label">Brightness <span class="control-value" id="brightness-val">80%</span></div>
+        <input type="range" class="brightness-slider" id="brightness" min="0" max="255" value="204"
+               oninput="onBrightnessChange(this.value)">
+        <div class="control-label" style="margin-top:14px;">Speed <span class="control-value" id="speed-val">50%</span></div>
+        <input type="range" class="speed-slider" id="speed" min="0" max="255" value="128"
+               oninput="onSpeedChange(this.value)">
+      </div>
+
+      <!-- EFFECTS -->
+      <div class="control-block full">
+        <div class="control-label">
+          Effect Mode
+          <button class="btn-edit-effects" onclick="openFxDrawer()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            EDIT
+          </button>
+        </div>
+        <div class="effect-grid" id="effect-grid"></div>
+      </div>
+
+      <!-- SCENES -->
+      <div class="control-block full">
+        <div class="control-label">Quick Scenes</div>
+        <div class="scene-grid">
+          <button class="scene-btn" onclick="applyScene('chill')">
+            <span class="scene-icon">🌙</span>Chill
+          </button>
+          <button class="scene-btn" onclick="applyScene('focus')">
+            <span class="scene-icon">⚡</span>Focus
+          </button>
+          <button class="scene-btn" onclick="applyScene('party')">
+            <span class="scene-icon">🎉</span>Party
+          </button>
+          <button class="scene-btn" onclick="applyScene('warm')">
+            <span class="scene-icon">🕯</span>Warm
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /controls-grid -->
+
+      <!-- AUTO CYCLE -->
+      <div class="control-block full adv-block">
+        <div class="control-label">
+          Auto Cycle
+          <div class="toggle-small" id="cycle-toggle" onclick="toggleAutoCycle()"></div>
+        </div>
+        <div class="adv-sub" id="cycle-body">
+          <div>
+            <div class="adv-row">
+              <span class="adv-row-label">Cycle every</span>
+              <div class="stepper">
+                <button onclick="adjustCycle(-5)">−</button>
+                <span id="cycle-val">15s</span>
+                <button onclick="adjustCycle(5)">+</button>
+              </div>
+            </div>
+            <div class="cycle-bar-wrap">
+              <div class="cycle-bar" id="cycle-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIO RESPONSIVE -->
+      <div class="control-block full adv-block" id="audio-block">
+        <div class="control-label">
+          Audio Responsive
+          <div class="toggle-small" id="audio-toggle" onclick="toggleAudio()"></div>
+        </div>
+        <div class="adv-sub" id="audio-body">
+          <div>
+            <div class="adv-row">
+              <span class="adv-row-label">Sensitivity</span>
+              <input type="range" class="speed-slider" id="audio-sensitivity" min="0" max="255" value="128" oninput="onAudioSensChange(this.value)" style="flex:1;">
+              <span class="adv-row-value" id="audio-sens-val">50%</span>
+            </div>
+            <div class="adv-row" style="margin-top:10px;">
+              <span class="adv-row-label">Mode</span>
+              <div class="audio-mode-group" id="audio-mode-group">
+                <button class="audio-mode-btn active" data-amode="0" onclick="setAudioMode(this)">PULSE</button>
+                <button class="audio-mode-btn" data-amode="1" onclick="setAudioMode(this)">SPECTRUM</button>
+                <button class="audio-mode-btn" data-amode="2" onclick="setAudioMode(this)">BEAT</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /controls-body -->
+
+    <!-- LOG ACCORDION -->
+    <div id="log-accordion">
+      <button id="log-toggle" onclick="toggleLog()">
+        <span class="log-toggle-left">
+          BLE LOG
+          <span class="log-count" id="log-count">0</span>
+        </span>
+        <svg class="log-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      <div id="ble-log">
+        <div id="ble-log-inner">
+          <div class="log-entry"><span class="log-time">—</span><span class="log-info">Ready. Connect a device to begin.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS ACCORDION -->
+    <div id="settings-accordion">
+      <button id="settings-toggle" onclick="toggleSettings()">
+        <span class="log-toggle-left">SETTINGS</span>
+        <svg class="log-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      <div id="settings-body">
+        <div id="settings-body-inner">
+          <div class="control-label">Gamma <span class="control-value" id="gamma-val">2.2</span></div>
+          <input type="range" class="speed-slider" id="gamma-slider" min="10" max="40" value="22"
+                 oninput="onGammaChange(this.value)" style="width:100%;margin-top:8px;">
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /control-panel -->
+
+  <!-- empty state when no device selected -->
+  <div id="no-device-state">
+    <div class="no-device-inner">
+      <div class="no-device-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
+      </div>
+      <div class="no-device-msg">No device selected</div>
+      <div class="no-device-sub">Scan for a device or open the devices panel to connect</div>
+      <button class="btn-scan no-device-scan pulse-glow" onclick="openScanModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+          <path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/>
+        </svg>
+        <span class="btn-label">SCAN FOR DEVICES</span>
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = {
+  devices: [],
+  active: null,
+  power: true,
+  color: '#ff6b35',
+  color2: '#7b5cfa',
+  color3: '#3dffc0',
+  gamma: 2.2,
+  brightness: 204,
+  speed: 128,
+  effect: 0,
+};
+
+// Per-device local state so each device remembers its own settings
+const deviceState = {};
+
+// ── MOCK BLE DEVICES ────────────────────────────────────────────────────────
+const MOCK_NEARBY = [
+  { id: 'ble-a1b2-c3d4-e5f6', name: 'Desk Strip',   rssi: -42, type: 'LED Strip',    hasBattery: false, hasAudio: true,  ledCount: 144, voltage: 5,  fixtureUri: null },
+  { id: 'ble-f6e5-d4c3-b2a1', name: 'Shelf Ring',   rssi: -61, type: 'LED Ring',     hasBattery: true,  hasAudio: false, ledCount: 60,  voltage: 5,  batteryMah: 2000, fixtureUri: null },
+  { id: 'ble-1122-3344-5566', name: 'Bias Light',   rssi: -55, type: 'LED Strip',    hasBattery: false, hasAudio: true,  ledCount: 90,  voltage: 5,  fixtureUri: 'https://bleam.local/fixture/bias-light.json' },
+  { id: 'ble-aabb-ccdd-eeff', name: 'Cabinet Glow', rssi: -78, type: 'LED Diffuser', hasBattery: true,  hasAudio: false, ledCount: 30,  voltage: 12, batteryMah: 1200, fixtureUri: 'https://bleam.local/fixture/cabinet-glow.json' },
+  { id: 'ble-9911-2233-4455', name: 'Moon Orb', rssi: -50, type: 'PHI ORB', hasBattery: true, hasAudio: false, ledCount: 30, voltage: 5, batteryMah: 1500, fixtureUri: null, modelUri: 'builtin:phi-orb' },
+];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+
+function mockWrite(charName, value) {
+  if (state.active === null) return;
+  const dev = state.devices[state.active];
+  log(`→ ${dev.name}  ${charName}: ${Array.from(value).join(',')}`, 'ok');
+}
+
+function rssiBar(rssi) {
+  // -40 strong, -80 weak
+  const pct = Math.max(0, Math.min(100, ((rssi + 80) / 40) * 100));
+  const bars = Math.ceil(pct / 25); // 0–4 bars
+  return Array.from({length:4}, (_,i) =>
+    `<span style="display:inline-block;width:3px;height:${6+i*3}px;border-radius:1px;background:${i < bars ? 'var(--connected)' : 'var(--muted)'};margin-right:1px;vertical-align:bottom;"></span>`
+  ).join('');
+}
+
+// ── SCAN MODAL ─────────────────────────────────────────────────────────────
+function scanForDevices() {
+  openScanModal();
+}
+
+function openScanModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'scan-overlay';
+  overlay.innerHTML = `
+    <div id="scan-modal">
+      <div class="scan-modal-header">
+        <div>
+          <div class="scan-modal-title">ADD DEVICE</div>
+          <div class="scan-modal-sub" id="scan-modal-sub">Choose a pairing method</div>
+        </div>
+        <button class="scan-close" onclick="closeScanModal()">✕</button>
+      </div>
+
+      <!-- Method tabs -->
+      <div class="scan-method-tabs">
+        <button class="scan-method-tab active" data-method="ble" onclick="switchScanMethod('ble',this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l4 4-4 4V2zM12 14l4 4-4 4v-8zM4 7l4 5-4 5"/></svg>
+          BLE SCAN
+        </button>
+        <button class="scan-method-tab" data-method="qr" onclick="switchScanMethod('qr',this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="19" y="14" width="2" height="2"/><rect x="14" y="19" width="2" height="2"/><rect x="19" y="19" width="2" height="2"/></svg>
+          QR CODE
+        </button>
+        <button class="scan-method-tab" data-method="nfc" onclick="switchScanMethod('nfc',this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7a9 9 0 010 10M17 9.5a5 5 0 010 5M4 7a9 9 0 000 10M7 9.5a5 5 0 000 5M12 12h.01"/></svg>
+          NFC TAP
+        </button>
+      </div>
+
+      <!-- BLE panel -->
+      <div class="scan-panel" id="scan-panel-ble">
+        <div class="scan-wave-wrap">
+          <div class="scan-wave"></div>
+          <div class="scan-wave" style="animation-delay:0.6s"></div>
+          <div class="scan-wave" style="animation-delay:1.2s"></div>
+          <div class="scan-center-dot"></div>
+        </div>
+        <div id="scan-results" class="scan-results"></div>
+        <div class="scan-footer">
+          <span id="scan-status-msg" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);letter-spacing:1px;">Searching…</span>
+        </div>
+      </div>
+
+      <!-- QR panel -->
+      <div class="scan-panel" id="scan-panel-qr" style="display:none;">
+        <div class="qr-viewfinder-wrap">
+          <div class="qr-viewfinder">
+            <div class="qr-corner tl"></div><div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div><div class="qr-corner br"></div>
+            <div class="qr-scan-line" id="qr-scan-line"></div>
+            <div class="qr-placeholder-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
+            </div>
+            <div class="qr-hint" id="qr-hint">Point camera at device QR code</div>
+          </div>
+        </div>
+        <div class="scan-footer" style="margin-top:12px;">
+          <button class="btn-scan-action" onclick="mockQrScan()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            SIMULATE QR SCAN
+          </button>
+        </div>
+      </div>
+
+      <!-- NFC panel -->
+      <div class="scan-panel" id="scan-panel-nfc" style="display:none;">
+        <div class="nfc-wrap">
+          <div class="nfc-rings">
+            <div class="nfc-ring r1"></div>
+            <div class="nfc-ring r2"></div>
+            <div class="nfc-ring r3"></div>
+            <div class="nfc-phone">
+              <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 1600 1600" preserveAspectRatio="xMidYMid meet">
+                <g transform="translate(0,1600) scale(0.1,-0.1)" fill="currentColor" stroke="none">
+                  <path d="M2697 15989 c-565 -50 -1108 -264 -1567 -619 -114 -88 -391 -362 -484 -480 -164 -206 -340 -509 -434 -745 -84 -211 -143 -430 -184 -680 l-23 -140 -3 -5105 c-2 -3709 0 -5145 8 -5250 70 -905 549 -1724 1304 -2229 357 -239 778 -402 1203 -466 209 -32 404 -36 1438 -33 l1030 3 -50 29 c-473 272 -900 980 -1135 1880 -136 521 -200 952 -262 1766 -9 116 -13 1563 -15 5719 l-3 5564 59 -54 c33 -30 1450 -1433 3150 -3119 l3091 -3065 0 -960 0 -960 -167 166 c-276 272 -3662 3637 -4288 4261 l-580 578 -3 -3028 c-3 -3056 0 -3387 34 -3957 76 -1289 257 -2251 558 -2968 58 -138 195 -404 271 -527 156 -251 434 -560 648 -719 357 -266 779 -449 1320 -571 l177 -41 2633 4 c2894 3 2667 -2 2983 62 961 194 1787 893 2148 1816 86 221 140 430 183 709 16 108 18 413 21 5185 2 3454 0 5117 -8 5217 -19 278 -61 490 -144 743 -374 1126 -1377 1914 -2561 2015 -72 6 -555 10 -1200 10 l-1080 0 58 -33 c100 -56 179 -119 297 -237 465 -463 808 -1273 979 -2310 54 -329 89 -654 123 -1145 8 -125 12 -1627 15 -5704 l4 -5533 -39 33 c-22 19 -1074 1060 -2338 2314 -1264 1254 -2665 2642 -3111 3085 l-813 805 0 964 0 963 1853 -1843 c1018 -1014 2152 -2143 2520 -2508 l667 -665 0 3025 c0 1749 -4 3153 -10 3329 -57 1794 -274 2992 -695 3838 -153 308 -311 536 -525 756 -221 227 -441 386 -735 531 -266 131 -536 223 -883 301 l-154 34 -2596 -1 c-1429 -1 -2636 -5 -2685 -10z"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="nfc-label" id="nfc-label">Hold phone near NFC tag on device</div>
+        </div>
+        <div class="scan-footer">
+          <button class="btn-scan-action" onclick="mockNfcTap()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7a9 9 0 010 10M17 9.5a5 5 0 010 5M4 7a9 9 0 000 10M7 9.5a5 5 0 000 5M12 12h.01"/></svg>
+            SIMULATE NFC TAP
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+  startBleScan();
+}
+
+function switchScanMethod(method, btn) {
+  document.querySelectorAll('.scan-method-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['ble','qr','nfc'].forEach(m => {
+    const p = document.getElementById(`scan-panel-${m}`);
+    if (p) p.style.display = m === method ? '' : 'none';
+  });
+  const subs = { ble: 'Looking for BLE lighting devices nearby…', qr: 'Scan the QR code on your device', nfc: 'Hold near an NFC-enabled device' };
+  document.getElementById('scan-modal-sub').textContent = subs[method];
+}
+
+function startBleScan() {
+  let found = 0;
+  const alreadyConnected = state.devices.map(d => d.id);
+  const available = MOCK_NEARBY.filter(d => !alreadyConnected.includes(d.id));
+  if (available.length === 0) {
+    const msg = document.getElementById('scan-status-msg');
+    if (msg) msg.textContent = 'No new devices found.';
+    return;
+  }
+  available.forEach((dev, i) => {
+    setTimeout(() => {
+      found++;
+      const results = document.getElementById('scan-results');
+      if (!results) return;
+      const el = document.createElement('div');
+      el.className = 'scan-device-row';
+      el.innerHTML = `
+        <div class="scan-dev-info">
+          <div class="scan-dev-name">${dev.name}</div>
+          <div class="scan-dev-meta">${dev.type} <span style="color:var(--muted)">·</span> ${dev.rssi} dBm ${rssiBar(dev.rssi)}</div>
+        </div>
+        <button class="btn-connect-device" onclick="mockConnect('${dev.id}')">CONNECT</button>`;
+      results.appendChild(el);
+      const msg = document.getElementById('scan-status-msg');
+      if (msg && found === available.length) msg.textContent = `${found} device${found>1?'s':''} found`;
+    }, 400 + i * 700);
+  });
+}
+
+function mockQrScan() {
+  const hint = document.getElementById('qr-hint');
+  const line = document.getElementById('qr-scan-line');
+  if (hint) hint.textContent = 'Scanning…';
+  if (line) line.classList.add('active');
+  setTimeout(() => {
+    if (line) line.classList.remove('active');
+    // Pick a random unconnected device to "discover" via QR
+    const alreadyConnected = state.devices.map(d => d.id);
+    const available = MOCK_NEARBY.filter(d => !alreadyConnected.includes(d.id));
+    if (available.length === 0) { if (hint) hint.textContent = 'No new devices found in QR data'; return; }
+    const dev = available[Math.floor(Math.random() * available.length)];
+    if (hint) hint.textContent = `Found: ${dev.name}`;
+    closeScanModal();
+    setTimeout(() => mockConnect(dev.id), 300);
+  }, 1800);
+}
+
+function mockNfcTap() {
+  const label = document.getElementById('nfc-label');
+  if (label) label.textContent = 'Reading NFC tag…';
+  document.querySelectorAll('.nfc-ring').forEach(r => r.classList.add('tap'));
+  setTimeout(() => {
+    const alreadyConnected = state.devices.map(d => d.id);
+    const available = MOCK_NEARBY.filter(d => !alreadyConnected.includes(d.id));
+    if (available.length === 0) { if (label) label.textContent = 'No new devices found'; return; }
+    const dev = available[Math.floor(Math.random() * available.length)];
+    if (label) label.textContent = `Tag read: ${dev.name}`;
+    closeScanModal();
+    setTimeout(() => mockConnect(dev.id), 300);
+  }, 1400);
+}
+
+function closeScanModal() {
+  const overlay = document.getElementById('scan-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  setTimeout(() => overlay.remove(), 300);
+}
+
+const connectingIds = new Set(); // guard against double-connects
+
+async function mockConnect(id) {
+  if (connectingIds.has(id)) return;
+  if (state.devices.find(d => d.id === id)) return; // already connected
+  connectingIds.add(id);
+  const dev = MOCK_NEARBY.find(d => d.id === id);
+  if (!dev) return;
+
+  // Show connecting state
+  const btn = document.querySelector(`.btn-connect-device[onclick="mockConnect('${id}')"]`);
+  if (btn) {
+    btn.textContent = 'CONNECTING…';
+    btn.disabled = true;
+    btn.style.color = 'var(--accent2)';
+    btn.style.borderColor = 'var(--accent2)';
+  }
+
+  log(`Connecting to ${dev.name}…`, 'info');
+
+  await delay(900);
+
+  // Simulate GATT handshake log steps
+  log(`Discovering GATT services…`, 'info');
+  await delay(400);
+  log(`Service found: LED_CONTROL`, 'ok');
+  await delay(300);
+  log(`Characteristics resolved: POWER, COLOR, BRIGHTNESS, EFFECT, SPEED`, 'ok');
+  await delay(200);
+
+  // Check for Battery Service (0x180F)
+  const hasBatt = dev.hasBattery;
+  let battLevel;
+  if (hasBatt) {
+    log(`Battery Service found (0x180F)`, 'ok');
+    await delay(200);
+    battLevel = 55 + Math.floor(Math.random() * 40); // mock 55–94%
+    log(`Battery Level: ${battLevel}%`, 'ok');
+  } else {
+    log(`Battery Service not available`, 'info');
+  }
+
+  // Add to state
+  const entry = {
+    id: dev.id,
+    name: dev.name,
+    type: dev.type,
+    rssi: dev.rssi,
+    connected: true,
+    hasBattery: hasBatt,
+    hasAudio: dev.hasAudio,
+    ledCount: dev.ledCount,
+    voltage: dev.voltage,
+    fixtureLayout: null,   // populated after fetch
+    fixtureUri: null,
+    modelUri: dev.modelUri || null,
+  };
+  deviceState[dev.id] = {
+    power: true, color: '#ff6b35', color2: '#7b5cfa', color3: '#3dffc0', brightness: 204, speed: 128, effect: 0, gamma: 2.2,
+    autoCycle: false, cycleInterval: 10,
+    audioResponsive: false, audioSensitivity: 128, audioMode: 0,
+    ...(hasBatt ? { battery: battLevel } : {}),
+  };
+
+  state.devices.push(entry);
+  const idx = state.devices.length - 1;
+  state.active = idx;
+
+  if (hasBatt) startBatteryPoll(dev.id);
+
+  // ── Fixture definition characteristic (custom service/char on device)
+  if (dev.fixtureUri) {
+    log(`Fixture char found — URI: ${dev.fixtureUri}`, 'ok');
+    await delay(200);
+    fetchFixtureLayout(dev.id, dev.fixtureUri, idx);
+  } else {
+    log(`No fixture definition characteristic`, 'info');
+  }
+
+  log(`Connected: ${dev.name}`, 'ok');
+  setScanGlow(false);
+  closeScanModal();
+  renderDevices();
+  showControls(idx);
+  updateStatusBar(true, dev.name);
+  toast(`Connected to ${dev.name}`);
+  connectingIds.delete(id);
+  // Briefly show drawer so user sees the new device listed
+  openDrawer();
+  setTimeout(closeDrawer, 1800);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── BATTERY ────────────────────────────────────────────────────────────────
+// Real UUIDs: service 0x180F, char 0x2A19
+const batteryPollers = {}; // id → intervalId
+
+function batteryColor(pct) {
+  if (pct >= 50) return 'batt-high';
+  if (pct >= 20) return 'batt-med';
+  return 'batt-low';
+}
+
+function batteryHTML(pct) {
+  const cls = batteryColor(pct);
+  const fillColor = pct >= 50 ? 'var(--connected)' : pct >= 20 ? '#f0c040' : '#ff5577';
+  return `
+    <span class="battery-wrap ${cls}">
+      <span class="battery-icon">
+        <span class="batt-body">
+          <span class="batt-fill" style="width:${pct}%;background:${fillColor};"></span>
+        </span>
+        <span class="batt-tip"></span>
+      </span>
+      ${pct}%
+    </span>`;
+}
+
+function mockReadBattery(devId) {
+  // Simulate slight drift in battery level over time
+  const ds = deviceState[devId];
+  if (!ds || ds.battery === undefined) return;
+  // Slowly decrease (mock drain)
+  if (Math.random() < 0.3 && ds.battery > 1) ds.battery = Math.max(1, ds.battery - 1);
+  // Re-render wherever battery is shown
+  renderDevices();
+  const activedev = state.active !== null ? state.devices[state.active] : null;
+  if (activedev && activedev.id === devId) updatePanelBattery(devId);
+}
+
+function startBatteryPoll(devId) {
+  stopBatteryPoll(devId);
+  batteryPollers[devId] = setInterval(() => mockReadBattery(devId), 30000);
+}
+
+function stopBatteryPoll(devId) {
+  if (batteryPollers[devId]) { clearInterval(batteryPollers[devId]); delete batteryPollers[devId]; }
+}
+
+function updatePanelBattery(devId) {
+  const el = document.getElementById('panel-battery');
+  if (!el) return;
+  const ds = deviceState[devId];
+  if (!ds || ds.battery === undefined) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = batteryHTML(ds.battery);
+}
+
+// ── DRAWER ─────────────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('devices-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+function closeDrawer() {
+  // Exit edit mode on close
+  if (editMode) {
+    editMode = false;
+    document.getElementById('devices-drawer').classList.remove('editing');
+    document.getElementById('btn-edit').classList.remove('active');
+    document.getElementById('btn-edit').textContent = 'EDIT';
+    renderDevices();
+  }
+  document.getElementById('devices-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+// ── EDIT MODE ──────────────────────────────────────────────────────────────
+let editMode = false;
+
+function toggleEditMode() {
+  editMode = !editMode;
+  const drawer = document.getElementById('devices-drawer');
+  const btn = document.getElementById('btn-edit');
+  drawer.classList.toggle('editing', editMode);
+  btn.classList.toggle('active', editMode);
+  btn.textContent = editMode ? 'DONE' : 'EDIT';
+  renderDevices();
+}
+
+// ── REMOVE DEVICE (edit mode only) ─────────────────────────────────────────
+function removeDevice(idx) {
+  const dev = state.devices[idx];
+  // If it was the active device, clear controls
+  if (state.active === idx) {
+    state.active = null;
+    document.getElementById('control-panel').classList.remove('visible');
+    document.getElementById('no-device-state')?.classList.remove('hidden');
+    updateStatusBar(false);
+  } else if (state.active > idx) {
+    state.active--;
+  }
+  log(`Removed: ${dev.name}`, 'err');
+  state.devices.splice(idx, 1);
+  delete deviceState[dev.id];
+  renderDevices();
+  toast(`${dev.name} removed`);
+}
+
+// ── DRAG TO REORDER ────────────────────────────────────────────────────────
+let dragSrcIdx = null;
+
+function onDragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => {
+    document.querySelectorAll('.device-card')[idx]?.classList.add('dragging');
+  }, 0);
+}
+
+function onDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.device-card').forEach((c, i) => {
+    c.classList.toggle('drag-over', i === idx && i !== dragSrcIdx);
+  });
+}
+
+function onDragLeave() {
+  document.querySelectorAll('.device-card').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onDrop(e, idx) {
+  e.preventDefault();
+  if (dragSrcIdx === null || dragSrcIdx === idx) return;
+  // Reorder devices array
+  const moved = state.devices.splice(dragSrcIdx, 1)[0];
+  state.devices.splice(idx, 0, moved);
+  // Fix active index
+  if (state.active === dragSrcIdx) state.active = idx;
+  else if (state.active > dragSrcIdx && state.active <= idx) state.active--;
+  else if (state.active < dragSrcIdx && state.active >= idx) state.active++;
+  renderDevices();
+}
+
+function onDragEnd() {
+  dragSrcIdx = null;
+  document.querySelectorAll('.device-card').forEach(c => {
+    c.classList.remove('dragging', 'drag-over');
+  });
+}
+
+// ── RECONNECT ──────────────────────────────────────────────────────────────
+async function reconnectDevice(idx) {
+  const dev = state.devices[idx];
+  const card = document.querySelectorAll('.device-card')[idx];
+  const btn = card?.querySelector('.btn-reconnect');
+  if (btn) { btn.textContent = 'CONNECTING…'; btn.disabled = true; }
+
+  log(`Reconnecting to ${dev.name}…`, 'info');
+  await delay(800);
+  log(`Service found: LED_CONTROL`, 'ok');
+  await delay(400);
+  log(`Characteristics resolved: POWER, COLOR, BRIGHTNESS, EFFECT, SPEED`, 'ok');
+  await delay(200);
+
+  dev.connected = true;
+  state.active = idx;
+  if (dev.hasBattery) startBatteryPoll(dev.id);
+  log(`Reconnected: ${dev.name}`, 'ok');
+  toast(`Reconnected to ${dev.name}`);
+  renderDevices();
+  showControls(idx);
+  updateStatusBar(true, dev.name);
+}
+
+// ── DISCONNECT ─────────────────────────────────────────────────────────────
+function disconnectDevice(idx) {
+  const dev = state.devices[idx];
+  dev.connected = false;
+  stopBatteryPoll(dev.id);
+  stopCycleTimer();
+  log(`Disconnected: ${dev.name}`, 'err');
+  if (state.active === idx) {
+    const next = state.devices.findIndex((d,i) => i !== idx && d.connected);
+    if (next >= 0) {
+      state.active = next;
+      showControls(next);
+      updateStatusBar(true, state.devices[next].name);
+    } else {
+      state.active = null;
+      document.getElementById('control-panel').classList.remove('visible');
+      document.getElementById('no-device-state')?.classList.remove('hidden');
+      updateStatusBar(false);
+      setScanGlow(true);
+    }
+  }
+  renderDevices();
+  toast(`${dev.name} disconnected`);
+}
+
+// ── DEVICE CARD RENDERING ─────────────────────────────────────────────────
+function renderDevices() {
+  const grid = document.getElementById('devices-grid');
+  const connectedCount = state.devices.filter(d => d.connected).length;
+
+  // Update header count badge
+  const badge = document.getElementById('devices-count');
+  badge.textContent = connectedCount;
+  badge.style.display = connectedCount > 0 ? 'inline-block' : 'none';
+
+  // Sync mobile menu badge
+  const mobileBadge = document.getElementById('mobile-devices-count');
+  if (mobileBadge) {
+    mobileBadge.textContent = connectedCount;
+    mobileBadge.style.display = connectedCount > 0 ? 'inline-block' : 'none';
+  }
+
+  // Update drawer subtitle
+  document.getElementById('drawer-sub').textContent =
+    connectedCount === 0 ? 'No devices connected'
+    : connectedCount === 1 ? '1 device connected'
+    : `${connectedCount} devices connected`;
+
+  // Hide EDIT button if no devices
+  document.getElementById('btn-edit').style.display =
+    state.devices.length === 0 ? 'none' : '';
+
+  if (state.devices.length === 0) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
+      <p>Scan to discover devices</p>
+    </div>`;
+    return;
+  }
+
+  // Auto-sort: connected first, disconnected at bottom
+  const sorted = [
+    ...state.devices.map((d, i) => ({ d, i })).filter(x => x.d.connected),
+    ...state.devices.map((d, i) => ({ d, i })).filter(x => !x.d.connected),
+  ];
+
+  grid.innerHTML = sorted.map(({ d, i }) => {
+    const ds = deviceState[d.id] || {};
+    const isActive = i === state.active;
+    const draggable = editMode && d.connected ? 'draggable="true"' : '';
+    const dragEvents = editMode && d.connected
+      ? `ondragstart="onDragStart(event,${i})" ondragover="onDragOver(event,${i})"
+         ondragleave="onDragLeave()" ondrop="onDrop(event,${i})" ondragend="onDragEnd()"`
+      : '';
+
+    return `
+    <div class="device-card ${isActive ? 'active' : ''} ${!d.connected ? 'disconnected' : 'connected-card'}"
+         onclick="${!editMode && d.connected ? `selectDevice(${i})` : ''}"
+         ${draggable} ${dragEvents}
+         style="${editMode ? 'cursor:default;' : ''}">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div class="drag-handle" title="Drag to reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/>
+            <circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/>
+            <circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/>
+          </svg>
+        </div>
+        <div style="min-width:0;flex:1;overflow:hidden;">
+          <div class="device-name">
+            <span class="${d.connected ? 'badge-live' : 'badge-off'}">${d.connected ? 'LIVE' : 'OFF'}</span>
+            ${d.name}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+            <div class="device-id" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.type} · ${d.rssi} dBm ${rssiBar(d.rssi)}</div>
+            ${d.hasBattery && ds.battery !== undefined ? batteryHTML(ds.battery) : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          ${!editMode ? `<div class="device-color-preview" style="background:${ds.color || '#ff6b35'};${!ds.power ? 'opacity:0.2;' : ''}"></div>` : ''}
+          ${editMode ? `
+            <button class="btn-delete" onclick="event.stopPropagation();removeDevice(${i})" title="Remove device">✕</button>
+          ` : !d.connected ? `
+            <button class="btn-reconnect" onclick="event.stopPropagation();reconnectDevice(${i})">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+              RECONNECT
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectDevice(idx) {
+  const dev = state.devices[idx];
+  if (!dev.connected) return;
+  state.active = idx;
+  // Sync UI to this device's state
+  const ds = deviceState[dev.id];
+  state.power      = ds.power;
+  state.color      = ds.color;
+  state.color2     = ds.color2 || '#7b5cfa';
+  state.color3     = ds.color3 || '#3dffc0';
+  state.brightness = ds.brightness;
+  state.speed      = ds.speed;
+  state.effect     = ds.effect;
+  renderDevices();
+  showControls(idx);
+}
+
+function showControls(idx) {
+  const panel = document.getElementById('control-panel');
+  panel.classList.add('visible');
+  document.getElementById('no-device-state')?.classList.add('hidden');
+  const d = state.devices[idx];
+  const ds = deviceState[d.id];
+  document.getElementById('active-device-name').textContent = d.name;
+  document.getElementById('active-device-id').textContent = `${d.type} · ${d.id}`;
+  updatePanelBattery(d.id);
+
+  // Auto-select best fixture view
+  const typeLC = d.type.toLowerCase();
+  const toggleBtn = document.getElementById('hud-view-toggle');
+  if (d.modelUri) {
+    setFixture('3d');
+    init3DHud(d);
+    toggleBtn.style.display = 'block';
+    toggleBtn.textContent = '2D';
+  } else if (d.fixtureLayout) {
+    teardown3DHud();
+    setFixture('custom');
+    toggleBtn.style.display = 'none';
+  } else if (typeLC.includes('ring')) {
+    teardown3DHud();
+    setFixture('ring');
+    toggleBtn.style.display = 'none';
+  } else if (typeLC.includes('diffuser') || typeLC.includes('bulb') || typeLC.includes('orb')) {
+    teardown3DHud();
+    setFixture('bulb');
+    toggleBtn.style.display = 'none';
+  } else {
+    teardown3DHud();
+    setFixture('strip');
+    toggleBtn.style.display = 'none';
+  }
+
+  startHud();
+
+  // Restore controls to device state
+  activeColorSlot = 1;
+  document.getElementById('brightness').value = ds.brightness;
+  document.getElementById('brightness-val').textContent = Math.round(ds.brightness/255*100)+'%';
+  document.getElementById('speed').value = ds.speed;
+  document.getElementById('speed-val').textContent = Math.round(ds.speed/255*100)+'%';
+  const gamma = ds.gamma || 2.2;
+  document.getElementById('gamma-slider').value = Math.round(gamma * 10);
+  document.getElementById('gamma-val').textContent = gamma.toFixed(1);
+
+  document.querySelectorAll('.effect-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.mode) === ds.effect);
+  });
+  renderEffectGrid();
+  activeColorSlot = 1;
+  updateColorTabs();
+
+  const toggle = document.getElementById('power-toggle');
+  toggle.classList.toggle('on', ds.power);
+
+  // Dim controls if power is off
+  document.getElementById('controls-body').style.opacity = ds.power ? '1' : '0.4';
+  document.getElementById('controls-body').style.pointerEvents = ds.power ? '' : 'none';
+
+  syncAdvancedControls(idx);
+}
+
+// ── CONTROLS ───────────────────────────────────────────────────────────────
+function togglePower() {
+  if (state.active === null) return;
+  const dev = state.devices[state.active];
+  const ds = deviceState[dev.id];
+  ds.power = !ds.power;
+  state.power = ds.power;
+  document.getElementById('power-toggle').classList.toggle('on', ds.power);
+  document.getElementById('controls-body').style.opacity = ds.power ? '1' : '0.4';
+  document.getElementById('controls-body').style.pointerEvents = ds.power ? '' : 'none';
+  mockWrite('POWER', new Uint8Array([ds.power ? 1 : 0]));
+  renderDevices();
+  updatePowerDisplay();
+}
+
+function onColorChange(hex) {
+  state.color = hex;
+  document.getElementById('color-hex').textContent = hex.toUpperCase();
+  if (state.active !== null) {
+    deviceState[state.devices[state.active].id].color = hex;
+  }
+  document.querySelectorAll('.device-color-preview').forEach((el, i) => {
+    const d = state.devices[i];
+    if (d) el.style.background = deviceState[d.id]?.color || hex;
+  });
+  mockWrite('COLOR', new Uint8Array(hexToRgb(hex)));
+  updatePowerDisplay();
+  renderPresets();
+}
+
+function onBrightnessChange(val) {
+  state.brightness = parseInt(val);
+  const pct = Math.round(state.brightness / 255 * 100);
+  document.getElementById('brightness-val').textContent = pct + '%';
+  if (state.active !== null) deviceState[state.devices[state.active].id].brightness = state.brightness;
+  mockWrite('BRIGHTNESS', new Uint8Array([state.brightness]));
+  updatePowerDisplay();
+}
+
+function onGammaChange(val) {
+  const gamma = parseInt(val) / 10;
+  state.gamma = gamma;
+  document.getElementById('gamma-val').textContent = gamma.toFixed(1);
+  if (state.active !== null) deviceState[state.devices[state.active].id].gamma = gamma;
+  mockWrite('GAMMA', new Uint8Array([parseInt(val)]));
+}
+
+function onSpeedChange(val) {
+  state.speed = parseInt(val);
+  const pct = Math.round(state.speed / 255 * 100);
+  document.getElementById('speed-val').textContent = pct + '%';
+  if (state.active !== null) deviceState[state.devices[state.active].id].speed = state.speed;
+  mockWrite('SPEED', new Uint8Array([state.speed]));
+}
+
+// ── WS2812FX EFFECT LIBRARY ────────────────────────────────────────────────
+const WS2812FX_EFFECTS = [
+  { mode: 0,  name: 'Static' },
+  { mode: 1,  name: 'Blink' },
+  { mode: 2,  name: 'Breath' },
+  { mode: 3,  name: 'Color Wipe' },
+  { mode: 4,  name: 'Color Wipe Inv' },
+  { mode: 5,  name: 'Color Wipe Rev' },
+  { mode: 6,  name: 'Color Wipe Rev Inv' },
+  { mode: 7,  name: 'Color Wipe Random' },
+  { mode: 8,  name: 'Random Color' },
+  { mode: 9,  name: 'Single Dynamic' },
+  { mode: 10, name: 'Multi Dynamic' },
+  { mode: 11, name: 'Rainbow' },
+  { mode: 12, name: 'Rainbow Cycle' },
+  { mode: 13, name: 'Scan' },
+  { mode: 14, name: 'Dual Scan' },
+  { mode: 15, name: 'Fade' },
+  { mode: 16, name: 'Theater Chase' },
+  { mode: 17, name: 'Theater Chase Rainbow' },
+  { mode: 18, name: 'Running Lights' },
+  { mode: 19, name: 'Twinkle' },
+  { mode: 20, name: 'Twinkle Random' },
+  { mode: 21, name: 'Twinkle Fade' },
+  { mode: 22, name: 'Twinkle Fade Random' },
+  { mode: 23, name: 'Sparkle' },
+  { mode: 24, name: 'Flash Sparkle' },
+  { mode: 25, name: 'Hyper Sparkle' },
+  { mode: 26, name: 'Strobe' },
+  { mode: 27, name: 'Strobe Rainbow' },
+  { mode: 28, name: 'Multi Strobe' },
+  { mode: 29, name: 'Blink Rainbow' },
+  { mode: 30, name: 'Chase White' },
+  { mode: 31, name: 'Chase Color' },
+  { mode: 32, name: 'Chase Random' },
+  { mode: 33, name: 'Chase Rainbow' },
+  { mode: 34, name: 'Chase Flash' },
+  { mode: 35, name: 'Chase Flash Random' },
+  { mode: 36, name: 'Chase Rainbow White' },
+  { mode: 37, name: 'Chase Blackout' },
+  { mode: 38, name: 'Chase Blackout Rainbow' },
+  { mode: 39, name: 'Color Sweep Random' },
+  { mode: 40, name: 'Running Color' },
+  { mode: 41, name: 'Running Red Blue' },
+  { mode: 42, name: 'Running Random' },
+  { mode: 43, name: 'Larson Scanner' },
+  { mode: 44, name: 'Comet' },
+  { mode: 45, name: 'Fireworks' },
+  { mode: 46, name: 'Fireworks Random' },
+  { mode: 47, name: 'Merry Christmas' },
+  { mode: 48, name: 'Halloween' },
+  { mode: 49, name: 'Fire Flicker' },
+  { mode: 50, name: 'Fire Flicker Soft' },
+  { mode: 51, name: 'Fire Flicker Intense' },
+  { mode: 52, name: 'Dual Color Wipe In Out' },
+  { mode: 53, name: 'Dual Color Wipe In In' },
+  { mode: 54, name: 'Dual Color Wipe Out Out' },
+  { mode: 55, name: 'Dual Color Wipe Out In' },
+  { mode: 56, name: 'Circus Combustus' },
+  { mode: 57, name: 'Bicolor Chase' },
+  { mode: 58, name: 'Tricolor Chase' },
+  { mode: 59, name: 'Twinklefox' },
+  { mode: 60, name: 'Rain' },
+  { mode: 61, name: 'Block Dissolve' },
+  { mode: 62, name: 'ICU' },
+  { mode: 63, name: 'Dual Larson' },
+  { mode: 64, name: 'Running Random 2' },
+  { mode: 65, name: 'Filler Up' },
+  { mode: 66, name: 'Rainbow Larson' },
+  { mode: 67, name: 'Rainbow Fireworks' },
+  { mode: 68, name: 'Trifade' },
+  { mode: 69, name: 'VU Meter' },
+  { mode: 70, name: 'Heartbeat' },
+  { mode: 71, name: 'Bits' },
+  { mode: 72, name: 'Multi Comet' },
+  { mode: 73, name: 'Flipbook' },
+  { mode: 74, name: 'Popcorn' },
+  { mode: 75, name: 'Oscillator' },
+];
+
+const FX_ICONS = [
+  // Light & glow
+  '💡','🕯️','🔆','🌟','✨','⭐','💫','🌠','✦','✧','❋','✼','❇️','🔮',
+  // Fire & heat
+  '🔥','♨️','🌋','💥','⚡','🌩️','☄️',
+  // Water & nature
+  '🌊','💧','❄️','🌨️','🌈','🌸','🌺','🍀','🌿','🌙','☀️','🌤️',
+  // Celebration
+  '🎆','🎇','🎉','🎊','🎈','🎠','🪩','🥳',
+  // Space
+  '🌀','🪐','🛸','🔭','🌌','👁️','🫧',
+  // Symbols & shapes
+  '◼','◻','◆','◇','●','○','▲','△','▶️','⏩','🔄','↩️','⬆️','⬇️',
+  '〰','∿','≋','⌇','⌁','⟳','⊛','⊕','⊗',
+  // Animals & nature
+  '🦋','🐝','🐉','🦊','🐺','🦅','🐙','🦑',
+  // Objects
+  '🏮','🪔','💎','🔴','🟠','🟡','🟢','🔵','🟣','⚪','🔮',
+  // Moods
+  '💜','🧡','💛','💚','💙','🩷','🤍','🖤',
+];
+
+// ── USER EFFECT SLOTS ──────────────────────────────────────────────────────
+let fxSlots = [
+  { mode: 0,  name: 'Static',   icon: '◼' },
+  { mode: 2,  name: 'Breath',   icon: '〰' },
+  { mode: 11, name: 'Rainbow',  icon: '🌈' },
+  { mode: 26, name: 'Strobe',   icon: '⚡' },
+  { mode: 16, name: 'Theater Chase', icon: '🌊' },
+  { mode: 23, name: 'Sparkle',  icon: '✦' },
+];
+
+function renderEffectGrid() {
+  const grid = document.getElementById('effect-grid');
+  if (!grid) return;
+  grid.innerHTML = fxSlots.map((fx, i) => `
+    <button class="effect-btn ${state.effect === fx.mode ? 'active' : ''}"
+            data-mode="${fx.mode}" onclick="setEffectByMode(${fx.mode}, '${fx.name}')">
+      <span class="effect-icon">${fx.icon}</span>
+      <span class="effect-label">${fx.name}</span>
+    </button>`).join('');
+}
+
+function setEffectByMode(mode, name) {
+  state.effect = mode;
+  if (state.active !== null) deviceState[state.devices[state.active].id].effect = mode;
+  mockWrite('EFFECT', new Uint8Array([mode]));
+  log(`Effect → ${name}`, 'info');
+  renderEffectGrid();
+  updatePowerDisplay();
+  updateColorTabs();
+}
+
+function setEffect(btn) {
+  // Legacy — kept for showControls compat
+  const mode = parseInt(btn.dataset.mode);
+  setEffectByMode(mode, btn.querySelector('.effect-label')?.textContent || '');
+}
+
+// ── FX DRAWER ─────────────────────────────────────────────────────────────
+let fxDragSrc = null;
+
+function openFxDrawer() {
+  populateFxSelects();
+  renderFxList();
+  document.getElementById('fx-drawer').classList.add('open');
+  document.getElementById('fx-drawer-overlay').classList.add('open');
+}
+
+function closeFxDrawer() {
+  document.getElementById('fx-drawer').classList.remove('open');
+  document.getElementById('fx-drawer-overlay').classList.remove('open');
+  renderEffectGrid(); // sync main grid
+}
+
+let selectedFxIcon = '✦';
+
+function populateFxSelects() {
+  const efSel = document.getElementById('fx-select-effect');
+  efSel.innerHTML = '<option value="">— Choose effect —</option>' +
+    WS2812FX_EFFECTS.map(e =>
+      `<option value="${e.mode}">${e.mode.toString().padStart(2,'0')} · ${e.name}</option>`
+    ).join('');
+  renderIconGrid('');
+}
+
+function renderIconGrid(query) {
+  const grid = document.getElementById('fx-icon-grid');
+  if (!grid) return;
+  const q = query.toLowerCase().trim();
+  // Simple keyword map for searchability
+  const keywords = {
+    'fire':'🔥♨️🌋💥⚡🌩️☄️', 'water':'🌊💧❄️🌨️', 'rainbow':'🌈',
+    'star':'🌟✨⭐💫🌠✦✧❋✼', 'heart':'💜🧡💛💚💙🩷🤍🖤',
+    'light':'💡🕯️🔆✨💫🔮🌟', 'party':'🎆🎇🎉🎊🎈🥳🪩',
+    'nature':'🌸🌺🍀🌿🌙☀️🌤️', 'space':'🌌🪐🛸🔭🌠☄️👁️',
+    'spin':'🔄🌀⟳', 'arrow':'▶️⏩↩️⬆️⬇️◀️',
+    'shape':'◼◻◆◇●○▲△', 'wave':'〰∿≋⌇⌁', 'glow':'🌟✨💫🔮✦❇️',
+    'animal':'🦋🐝🐉🦊🐺🦅🐙🦑', 'color':'🔴🟠🟡🟢🔵🟣⚪',
+  };
+  let filtered = FX_ICONS;
+  if (q) {
+    const direct = FX_ICONS.filter(ic => ic.toLowerCase().includes(q));
+    const fromKw = Object.entries(keywords)
+      .filter(([k]) => k.includes(q))
+      .flatMap(([,v]) => [...v].filter(c => c.trim()))
+      .filter(ic => FX_ICONS.includes(ic));
+    filtered = [...new Set([...direct, ...fromKw])];
+    if (!filtered.length) filtered = FX_ICONS;
+  }
+  grid.innerHTML = '';
+  filtered.forEach(ic => {
+    const btn = document.createElement('button');
+    btn.className = 'fx-icon-btn' + (ic === selectedFxIcon ? ' selected' : '');
+    btn.textContent = ic;
+    btn.title = ic;
+    btn.onclick = () => {
+      selectedFxIcon = ic;
+      document.getElementById('fx-icon-selected').textContent = ic;
+      grid.querySelectorAll('.fx-icon-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    grid.appendChild(btn);
+  });
+}
+
+function renderFxList() {
+  const list = document.getElementById('fx-list');
+  if (fxSlots.length === 0) {
+    list.innerHTML = `<div style="padding:24px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">No effects added yet</div>`;
+    return;
+  }
+  list.innerHTML = fxSlots.map((fx, i) => `
+    <div class="fx-item" draggable="true"
+         ondragstart="fxDragStart(event,${i})" ondragover="fxDragOver(event,${i})"
+         ondragleave="fxDragLeave(event)" ondrop="fxDrop(event,${i})"
+         ondragend="fxDragEnd()">
+      <div class="fx-drag-handle">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/>
+          <circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/>
+          <circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="fx-item-icon">${fx.icon}</div>
+      <div class="fx-item-name">${fx.name}</div>
+      <div class="fx-item-mode">#${fx.mode.toString().padStart(2,'0')}</div>
+      <button class="btn-fx-delete" onclick="removeFxSlot(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addFxSlot() {
+  const efSel = document.getElementById('fx-select-effect');
+  const modeVal = efSel.value;
+  if (!modeVal) { toast('Pick an effect first'); return; }
+  const mode = parseInt(modeVal);
+  const fx = WS2812FX_EFFECTS.find(e => e.mode === mode);
+  const icon = selectedFxIcon || '✦';
+  if (fxSlots.find(s => s.mode === mode)) { toast('Effect already added'); return; }
+  fxSlots.push({ mode, name: fx.name, icon });
+  efSel.value = '';
+  renderFxList();
+  renderEffectGrid();
+  toast(`Added: ${fx.name}`);
+}
+
+function removeFxSlot(i) {
+  const name = fxSlots[i].name;
+  fxSlots.splice(i, 1);
+  renderFxList();
+  renderEffectGrid();
+  toast(`Removed: ${name}`);
+}
+
+function fxDragStart(e, i) {
+  fxDragSrc = i;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.querySelectorAll('.fx-item')[i]?.classList.add('dragging'), 0);
+}
+function fxDragOver(e, i) {
+  e.preventDefault();
+  document.querySelectorAll('.fx-item').forEach((el, j) =>
+    el.classList.toggle('drag-over', j === i && j !== fxDragSrc));
+}
+function fxDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function fxDrop(e, i) {
+  e.preventDefault();
+  if (fxDragSrc === null || fxDragSrc === i) return;
+  const moved = fxSlots.splice(fxDragSrc, 1)[0];
+  fxSlots.splice(i, 0, moved);
+  renderFxList();
+}
+function fxDragEnd() {
+  fxDragSrc = null;
+  document.querySelectorAll('.fx-item').forEach(el =>
+    el.classList.remove('dragging', 'drag-over'));
+}
+
+// Effects that support a secondary colour (alternate, blend, or background)
+// Effects that support 2 colors; effects that support 3
+const DUAL_COLOR_EFFECTS  = new Set([1, 2, 15, 16, 18, 26, 43, 44, 19, 23, 60, 70]);
+const TRIPLE_COLOR_EFFECTS = new Set([16, 18, 43, 44]); // subset that gains a 3rd
+
+// Which color slot is active in the picker UI (1, 2, or 3)
+let activeColorSlot = 1;
+
+function getSlotKey(slot) { return slot === 1 ? 'color' : slot === 2 ? 'color2' : 'color3'; }
+function getSlotDefault(slot) { return slot === 1 ? '#ff6b35' : slot === 2 ? '#7b5cfa' : '#3dffc0'; }
+
+function getActiveDs() {
+  return state.active !== null ? deviceState[state.devices[state.active].id] : null;
+}
+
+function updateColorTabs() {
+  const ds = getActiveDs();
+  const effect = ds ? ds.effect : state.effect;
+  const hasDual   = DUAL_COLOR_EFFECTS.has(effect);
+  const hasTriple = TRIPLE_COLOR_EFFECTS.has(effect);
+  const maxSlot   = hasTriple ? 3 : hasDual ? 2 : 1;
+
+  if (activeColorSlot > maxSlot) activeColorSlot = 1;
+
+  const bar = document.getElementById('color-tab-bar');
+  if (!bar) return;
+
+  if (maxSlot <= 1) {
+    bar.style.display = 'none';
+    syncPickerToSlot();
+    return;
+  }
+
+  bar.style.display = '';
+  bar.innerHTML = '';
+
+  const labels = ['Color 1', 'Color 2', 'Color 3'];
+  const tabWrap = document.createElement('div');
+  tabWrap.style.cssText = 'display:flex;gap:6px;';
+
+  for (let s = 1; s <= maxSlot; s++) {
+    const key = getSlotKey(s);
+    const hex = (ds ? ds[key] : state[key]) || getSlotDefault(s);
+    const btn = document.createElement('button');
+    btn.className = 'color-slot-tab' + (s === activeColorSlot ? ' active' : '');
+    btn.style.setProperty('--slot-color', hex);
+    btn.innerHTML = `<span class="slot-dot"></span><span class="slot-lbl">${labels[s-1]}</span>`;
+    btn.onclick = () => { activeColorSlot = s; syncPickerToSlot(); updateColorTabs(); };
+    tabWrap.appendChild(btn);
+  }
+  bar.appendChild(tabWrap);
+}
+
+function syncPickerToSlot() {
+  const ds = getActiveDs();
+  const key = getSlotKey(activeColorSlot);
+  const hex = (ds ? ds[key] : state[key]) || getSlotDefault(activeColorSlot);
+  document.getElementById('color-picker').value = hex;
+  document.getElementById('color-hex').textContent = hex.toUpperCase();
+  renderPresets();
+}
+
+function onActiveColorChange(hex) {
+  const key = getSlotKey(activeColorSlot);
+  state[key] = hex;
+  document.getElementById('color-hex').textContent = hex.toUpperCase();
+  const ds = getActiveDs();
+  if (ds) ds[key] = hex;
+  mockWrite('COLOR' + (activeColorSlot > 1 ? activeColorSlot : ''), new Uint8Array(hexToRgb(hex)));
+  updatePowerDisplay();
+  renderPresets();
+  // Update the dot on the active tab without full re-render
+  const activeDot = document.querySelector('.color-slot-tab.active .slot-dot');
+  if (activeDot) activeDot.style.background = hex;
+  document.querySelector('.color-slot-tab.active')?.style.setProperty('--slot-color', hex);
+}
+
+// Legacy aliases kept for scene/device-switch calls
+function onColorChange(hex) {
+  activeColorSlot = 1;
+  onActiveColorChange(hex);
+  updateColorTabs();
+}
+function onColor2Change(hex) {
+  activeColorSlot = 2;
+  onActiveColorChange(hex);
+}
+
+const BUILTIN_PRESETS = [
+  '#ff0000','#ff2244','#ff4500','#ff6b35','#ff8c00',
+  '#ffcc00','#aaff00','#00ff88','#3dffc0','#00ffff',
+  '#00aaff','#0055ff','#4422ff','#7b5cfa','#aa00ff',
+  '#ff00cc','#ff44cc','#ff0077','#ffffff','#aabbcc',
+];
+
+let customPresets = [];
+
+function renderPresets() {
+  const wrap = document.getElementById('color-presets');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const ds  = getActiveDs();
+  const key = getSlotKey(activeColorSlot);
+  const current = (ds ? ds[key] : state[key]) || getSlotDefault(activeColorSlot);
+
+  const allColors = [
+    ...BUILTIN_PRESETS.map(c => ({ color: c, custom: false })),
+    ...customPresets.map(c => ({ color: c, custom: true })),
+  ];
+
+  allColors.forEach(({ color, custom }) => {
+    const div = document.createElement('div');
+    div.className = 'preset-swatch' + (custom ? ' custom' : '');
+    div.style.background = color;
+    div.style.setProperty('--swatch-color', color);
+    div.dataset.color = color;
+    div.title = color;
+    if (color.toLowerCase() === current.toLowerCase()) div.classList.add('selected');
+    div.onclick = () => {
+      document.getElementById('color-picker').value = color;
+      onActiveColorChange(color);
+    };
+    if (custom) {
+      const x = document.createElement('div');
+      x.className = 'del-x';
+      x.textContent = '×';
+      x.onclick = e => { e.stopPropagation(); deleteCustomPreset(color); };
+      div.appendChild(x);
+    }
+    wrap.appendChild(div);
+  });
+
+  const btn = document.createElement('button');
+  btn.className = 'preset-save-btn';
+  btn.title = 'Save current colour';
+  btn.textContent = '+';
+  btn.onclick = () => {
+    const hex = document.getElementById('color-picker')?.value;
+    if (!hex) return;
+    const norm = hex.toLowerCase();
+    if (!BUILTIN_PRESETS.map(c=>c.toLowerCase()).includes(norm) &&
+        !customPresets.map(c=>c.toLowerCase()).includes(norm)) {
+      customPresets.push(hex);
+      renderPresets();
+    }
+  };
+  wrap.appendChild(btn);
+}
+
+function deleteCustomPreset(hex) {
+  customPresets = customPresets.filter(c => c.toLowerCase() !== hex.toLowerCase());
+  renderPresets();
+}
+
+function setPreset(swatchOrHex) {
+  const hex = typeof swatchOrHex === 'string' ? swatchOrHex : swatchOrHex.dataset.color;
+  document.getElementById('color-picker').value = hex;
+  onActiveColorChange(hex);
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', () => { updateColorTabs(); });
+
+
+const SCENES = {
+  chill:  { color: '#3344ff', brightness: 60,  speed: 40,  effect: 1 },
+  focus:  { color: '#ffffff', brightness: 230, speed: 0,   effect: 0 },
+  party:  { color: '#ff44cc', brightness: 255, speed: 200, effect: 2 },
+  warm:   { color: '#ff8800', brightness: 120, speed: 30,  effect: 1 },
+};
+
+function applyScene(name) {
+  const s = SCENES[name];
+  if (!s) return;
+  document.getElementById('color-picker').value = s.color;
+  document.getElementById('brightness').value = s.brightness;
+  document.getElementById('speed').value = s.speed;
+  onColorChange(s.color);
+  onBrightnessChange(s.brightness);
+  onSpeedChange(s.speed);
+  document.querySelectorAll('.effect-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.mode) === s.effect);
+  });
+  state.effect = s.effect;
+  if (state.active !== null) deviceState[state.devices[state.active].id].effect = s.effect;
+  mockWrite('EFFECT', new Uint8Array([s.effect]));
+  renderEffectGrid();
+  log(`Scene → ${name.toUpperCase()} applied`, 'ok');
+  toast(`Scene: ${name.toUpperCase()}`);
+}
+
+// ── PHI ORB LED POSITIONS (from logo SVG, normalised to unit circle) ─────────
+const LOGO_LEDS = (function() {
+  const raw = [
+    { x:  0.0074, z:  0.0325, r: 0.1382 },
+    { x: -0.0552, z:  0.0374, r: 0.1409 },
+    { x: -0.0823, z: -0.0567, r: 0.1434 },
+    { x:  0.0308, z: -0.1298, r: 0.1461 },
+    { x:  0.1652, z: -0.0229, r: 0.1487 },
+    { x:  0.0975, z:  0.1746, r: 0.1514 },
+    { x: -0.1487, z:  0.1798, r: 0.1539 },
+    { x: -0.2532, z: -0.0838, r: 0.1566 },
+    { x: -0.0152, z: -0.2997, r: 0.1593 },
+    { x:  0.3042, z: -0.1364, r: 0.1618 },
+    { x:  0.2611, z:  0.2574, r: 0.1645 },
+    { x: -0.1586, z:  0.3672, r: 0.1670 },
+    { x: -0.4330, z: -0.0160, r: 0.1697 },
+    { x: -0.1530, z: -0.4409, r: 0.1722 },
+    { x:  0.3808, z: -0.3239, r: 0.1749 },
+    { x:  0.4694, z:  0.2534, r: 0.1776 },
+    { x: -0.0702, z:  0.5623, r: 0.1801 },
+    { x: -0.5818, z:  0.1465, r: 0.1828 },
+    { x: -0.3667, z: -0.5165, r: 0.1854 },
+    { x:  0.3668, z: -0.5568, r: 0.1881 },
+    { x:  0.6844, z:  0.1471, r: 0.1906 },
+    { x:  0.1160, z:  0.7241, r: 0.1933 },
+    { x: -0.6616, z:  0.3874, r: 0.1960 },
+    { x: -0.6270, z: -0.4970, r: 0.1985 },
+    { x:  0.2458, z: -0.7963, r: 0.2012 },
+    { x:  0.8645, z: -0.0618, r: 0.2037 },
+    { x:  0.3852, z:  0.8135, r: 0.2064 },
+    { x: -0.6414, z:  0.6780, r: 0.2089 },
+    { x: -0.8952, z: -0.3648, r: 0.2116 },
+    { x:  0.0162, z: -0.9999, r: 0.2143 },
+  ];
+  // Gently push inner LEDs outward — push strength falls off quickly beyond r=0.45
+  return raw.map(p => {
+    const dist = Math.sqrt(p.x * p.x + p.z * p.z);
+    const push = 0.09 * Math.max(0, 1 - dist / 0.45); // max +9% at center, zero at r≥0.45
+    if (dist < 0.001) return p; // dead-center: no direction, leave as-is
+    const scale = (dist + push) / dist;
+    return { x: p.x * scale, z: p.z * scale, r: p.r };
+  });
+})();
+
+// ── HUD CANVAS ENGINE ──────────────────────────────────────────────────────
+let hudFixture = 'strip'; // strip | ring | bulb
+let hudAnimFrame = null;
+let hudTick = 0;
+
+function setFixture(type) {
+  hudFixture = type;
+  document.querySelectorAll('.fixture-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.fixture === type));
+}
+
+function hexToRgbObj(hex) {
+  const [r,g,b] = hexToRgb(hex);
+  return {r,g,b};
+}
+
+// Returns per-LED colour array for current effect + tick
+function buildLedColors(count, ds, tick) {
+  const base  = hexToRgbObj(ds.color);
+  const base2 = hexToRgbObj(ds.color2 || '#7b5cfa');
+  const bPct  = ds.brightness / 255;
+  const sPct  = ds.speed / 255;
+  const speed = 0.167 + sPct * 4;
+  const t     = tick / 60 * speed;
+
+  const leds = new Array(count);
+
+  const dim = (c, f) => ({ r: Math.round(c.r*f), g: Math.round(c.g*f), b: Math.round(c.b*f) });
+  const lerp = (a, b, f) => ({
+    r: Math.round(a.r + (b.r - a.r) * f),
+    g: Math.round(a.g + (b.g - a.g) * f),
+    b: Math.round(a.b + (b.b - a.b) * f),
+  });
+  const wheel = (pos) => {
+    pos = ((pos % 256) + 256) % 256;
+    if (pos < 85)  return { r: pos*3,     g: 255-pos*3, b: 0 };
+    if (pos < 170) return { r: 255-((pos-85)*3), g: 0, b: (pos-85)*3 };
+    return { r: 0, g: (pos-170)*3, b: 255-(pos-170)*3 };
+  };
+
+  const mode = ds.effect;
+
+  for (let i = 0; i < count; i++) {
+    const n = i / count;
+
+    let c;
+    if (mode === 0) {                                          // Static
+      c = dim(base, bPct);
+
+    } else if (mode === 2) {                                   // Breath — fades base→base2
+      const f = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+      c = dim(lerp(base2, base, f), bPct);
+
+    } else if (mode === 11) {                                  // Rainbow
+      c = dim(wheel(Math.floor(n * 255)), bPct);
+
+    } else if (mode === 12) {                                  // Rainbow cycle
+      c = dim(wheel(Math.floor((n + t * 0.3) * 255)), bPct);
+
+    } else if (mode === 26) {                                  // Strobe — alternates base/base2
+      const phase = Math.floor(t * 8);
+      c = (Math.sin(t * Math.PI * 8) > 0.7)
+        ? dim(phase % 2 === 0 ? base : base2, bPct)
+        : { r:0, g:0, b:0 };
+
+    } else if (mode === 1) {                                   // Blink — alternates base/base2
+      const on = Math.floor(t * 2) % 2 === 0;
+      c = on ? dim(base, bPct) : dim(base2, bPct);
+
+    } else if (mode === 15) {                                  // Fade — base→base2 crossfade
+      const f = 0.5 + 0.5 * Math.sin(t * Math.PI);
+      c = dim(lerp(base, base2, f), bPct);
+
+    } else if (mode === 23) {                                  // Sparkle — base2 sparks on base bg
+      const spark = Math.random() < 0.04 ? 1 : 0;
+      c = spark ? dim(base2, bPct) : dim(base, bPct * 0.15);
+
+    } else if (mode === 43) {                                  // Larson scanner — base2 trail on base bg
+      const head = ((t * 0.5) % 2);
+      const pos = head < 1 ? head : 2 - head;
+      const dist = Math.abs(n - pos);
+      const glow = Math.max(0, 1 - dist * count * 0.3);
+      c = glow > 0.05
+        ? dim(lerp(base, base2, glow), bPct * glow * glow)
+        : dim(base, bPct * 0.05);
+
+    } else if (mode === 44) {                                  // Comet — base2 head, base tail
+      const head = (t * 0.4) % 1;
+      const behind = (n - head + 1) % 1;
+      const tail = behind < 0.25 ? (1 - behind / 0.25) : 0;
+      c = dim(lerp(base, base2, tail), bPct * tail);
+
+    } else if (mode === 45 || mode === 46) {                   // Fireworks
+      const spark2 = Math.random() < 0.015;
+      const glow2 = Math.random() < 0.03 ? Math.random() : 0;
+      const col = mode === 46 ? wheel(Math.floor(Math.random()*255)) : base;
+      c = spark2 ? dim(col, bPct) : dim(col, bPct * glow2 * 0.5);
+
+    } else if (mode === 49 || mode === 50 || mode === 51) {    // Fire flicker
+      const flicker = 0.4 + Math.random() * 0.6 * (mode === 51 ? 1 : mode === 50 ? 0.6 : 0.3);
+      c = { r: Math.round(base.r * bPct * flicker), g: Math.round(base.g * bPct * flicker * 0.4), b: 0 };
+
+    } else if (mode === 60) {                                  // Rain — base2 drops on base bg
+      const drop = Math.random() < 0.03;
+      c = drop ? dim(base2, bPct) : dim(base, bPct * 0.15);
+
+    } else if (mode === 19 || mode === 20) {                   // Twinkle — base2 twinkles on base
+      const tw = Math.random() < 0.06;
+      const col2 = mode === 20 ? wheel(Math.floor(Math.random()*255)) : base2;
+      c = tw ? dim(col2, bPct) : dim(base, bPct * 0.1);
+
+    } else if (mode === 16 || mode === 17) {                   // Theater chase — base2 off-beats
+      const phase = Math.floor(t * 3) % 3;
+      const lit = (i - phase) % 3 === 0;
+      const col3 = mode === 17 ? wheel(Math.floor((n + t*0.1)*255)) : base;
+      c = lit ? dim(col3, bPct) : dim(base2, bPct * 0.15);
+
+    } else if (mode === 18) {                                  // Running lights — base→base2 wave
+      const wave = 0.5 + 0.5 * Math.sin((n + t * 0.3) * Math.PI * 8);
+      c = dim(lerp(base, base2, wave), bPct);
+
+    } else if (mode === 70) {                                  // Heartbeat — base2 pulse on base bg
+      const hb = Math.max(0, Math.sin(t * Math.PI * 1.5) * Math.sin(t * Math.PI * 6));
+      c = hb > 0.05 ? dim(lerp(base, base2, hb), bPct * hb) : dim(base, bPct * 0.05);
+
+    } else if (mode === 74) {                                  // Popcorn
+      const pop = Math.random() < 0.02;
+      c = pop ? dim(wheel(Math.floor(Math.random()*255)), bPct) : { r:0,g:0,b:0 };
+
+    } else {                                                   // fallback — coloured sweep
+      const wave2 = 0.5 + 0.5 * Math.sin((n + t * 0.2) * Math.PI * 4);
+      c = dim(base, bPct * wave2);
+    }
+
+    leds[i] = c;
+  }
+  return leds;
+}
+
+function drawHud() {
+  const canvas = document.getElementById('hud-canvas');
+  if (!canvas) return;
+  const wrap   = document.getElementById('hud-canvas-wrap');
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width  = W;
+    canvas.height = H;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  if (state.active === null) { hudAnimFrame = requestAnimationFrame(drawHud); return; }
+  const dev = state.devices[state.active];
+  const ds  = deviceState[dev.id];
+  if (!ds) { hudAnimFrame = requestAnimationFrame(drawHud); return; }
+
+  // If 3D mode is active, let the Three.js loop handle rendering
+  if (hudFixture === '3d') {
+    update3DHud(ds, dev);
+    document.getElementById('hud-off-label').classList.toggle('visible', !ds.power);
+    hudTick++;
+    hudAnimFrame = requestAnimationFrame(drawHud);
+    return;
+  }
+
+  const powered = ds.power;
+
+  // OFF overlay
+  document.getElementById('hud-off-label').classList.toggle('visible', !powered);
+
+  const count = dev.ledCount || 60;
+  const leds  = powered ? buildLedColors(count, ds, hudTick) : new Array(count).fill({r:0,g:0,b:0});
+
+  // Count "meaningfully lit" LEDs — threshold of 12 excludes dim ambient backgrounds
+  const litCount = powered ? leds.filter(c => c.r + c.g + c.b > 12).length : 0;
+  const ledsEl = document.getElementById('hstat-leds');
+  if (ledsEl) ledsEl.textContent = `${litCount} of ${count}`;
+
+  ctx.fillStyle = '#07070d';
+  ctx.fillRect(0, 0, W, H);
+
+  if      (hudFixture === 'strip')  drawStrip(ctx, W, H, leds, count);
+  else if (hudFixture === 'ring')   drawRing(ctx, W, H, leds, count);
+  else if (hudFixture === 'bulb')   drawBulb(ctx, W, H, leds, count);
+  else if (hudFixture === 'custom') {
+    const layout = dev.fixtureLayout;
+    const customCount = layout ? layout.reduce((s, seg) => s + seg.count, 0) : count;
+    const customLeds  = ds.power ? buildLedColors(customCount, ds, hudTick - 1) : new Array(customCount).fill({r:0,g:0,b:0});
+    drawCustomFixture(ctx, W, H, customLeds);
+  }
+
+  hudTick++;
+  hudAnimFrame = requestAnimationFrame(drawHud);
+}
+
+function drawStrip(ctx, W, H, leds, count) {
+  const margin = 40;
+  const stripH  = 14;
+  const y = H / 2;
+  const usable = W - margin * 2;
+  const ledW   = usable / count;
+
+  // Glow layer (blurred wide pass)
+  for (let i = 0; i < count; i++) {
+    const c = leds[i];
+    if (c.r + c.g + c.b < 4) continue;
+    const x = margin + i * ledW + ledW / 2;
+    const rad = Math.max(ledW * 3, 18);
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    grd.addColorStop(0, `rgba(${c.r},${c.g},${c.b},0.22)`);
+    grd.addColorStop(1, `rgba(${c.r},${c.g},${c.b},0)`);
+    ctx.fillStyle = grd;
+    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+
+  // Fixture track
+  ctx.fillStyle = '#1a1a28';
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 1;
+  roundRect(ctx, margin - 4, y - stripH / 2 - 2, usable + 8, stripH + 4, 4);
+  ctx.fill(); ctx.stroke();
+
+  // LED dots
+  for (let i = 0; i < count; i++) {
+    const c = leds[i];
+    const x = margin + i * ledW + ledW / 2;
+    const r = Math.max(ledW * 0.38, 1.5);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
+    ctx.fill();
+    // specular
+    if (c.r + c.g + c.b > 30) {
+      ctx.beginPath();
+      ctx.arc(x - r * 0.25, y - r * 0.3, r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,0.45)`;
+      ctx.fill();
+    }
+  }
+
+  // end caps
+  ctx.fillStyle = '#2a2a3a';
+  roundRect(ctx, margin - 8, y - 8, 6, 16, 2); ctx.fill();
+  roundRect(ctx, W - margin + 2, y - 8, 6, 16, 2); ctx.fill();
+}
+
+function drawRing(ctx, W, H, leds, count) {
+  const cx = W / 2, cy = H / 2;
+  const R  = Math.min(W, H) * 0.36;
+  const ledR = Math.max((2 * Math.PI * R / count) * 0.35, 2.5);
+
+  // Glow halo
+  const avgC = leds.reduce((a, c) => ({r: a.r+c.r, g: a.g+c.g, b: a.b+c.b}), {r:0,g:0,b:0});
+  const n = leds.length;
+  const avg = { r: avgC.r/n|0, g: avgC.g/n|0, b: avgC.b/n|0 };
+  if (avg.r + avg.g + avg.b > 10) {
+    const halo = ctx.createRadialGradient(cx, cy, R*0.5, cx, cy, R*1.7);
+    halo.addColorStop(0, `rgba(${avg.r},${avg.g},${avg.b},0)`);
+    halo.addColorStop(0.6, `rgba(${avg.r},${avg.g},${avg.b},0.13)`);
+    halo.addColorStop(1, `rgba(${avg.r},${avg.g},${avg.b},0)`);
+    ctx.fillStyle = halo;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Ring track
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1e1e2e';
+  ctx.lineWidth = ledR * 2.5;
+  ctx.stroke();
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // LEDs
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(angle) * R;
+    const y = cy + Math.sin(angle) * R;
+    const c = leds[i];
+
+    // per-LED glow
+    if (c.r + c.g + c.b > 10) {
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, ledR * 3.5);
+      grd.addColorStop(0, `rgba(${c.r},${c.g},${c.b},0.35)`);
+      grd.addColorStop(1, `rgba(${c.r},${c.g},${c.b},0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(x, y, ledR * 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, ledR, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
+    ctx.fill();
+    if (c.r + c.g + c.b > 30) {
+      ctx.beginPath();
+      ctx.arc(x - ledR*0.25, y - ledR*0.3, ledR*0.35, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,0.4)`;
+      ctx.fill();
+    }
+  }
+}
+
+function drawBulb(ctx, W, H, leds, count) {
+  const cx = W / 2, cy = H / 2;
+  const LED_DOT_SCALE = 0.22; // dot radius = led.r * LED_DOT_SCALE * coordScale
+
+  // Find the true maximum reach (centre dist + dot radius) across ALL LEDs
+  const maxReach = LOGO_LEDS.reduce((m, p) => {
+    const d = Math.sqrt(p.x * p.x + p.z * p.z) + p.r * LED_DOT_SCALE;
+    return Math.max(m, d);
+  }, 0);
+
+  // coordScale maps normalised units → canvas px, with 4px margin inside the PCB disc
+  const Rpcb = Math.min(W, H) * 0.46;   // PCB disc radius in px
+  const coordScale = (Rpcb - 4) / maxReach; // every LED + dot stays inside Rpcb
+  const R = Rpcb; // alias for PCB drawing calls below
+
+  // Average colour for ambient glow
+  const n = leds.length;
+  const avgC = leds.reduce((a, c) => ({r:a.r+c.r, g:a.g+c.g, b:a.b+c.b}), {r:0,g:0,b:0});
+  const avg = { r: avgC.r/n|0, g: avgC.g/n|0, b: avgC.b/n|0 };
+  const lit = avg.r + avg.g + avg.b > 10;
+
+  // Outer ambient halo
+  if (lit) {
+    const halo = ctx.createRadialGradient(cx, cy, R * 0.3, cx, cy, R * 2.0);
+    halo.addColorStop(0,   `rgba(${avg.r},${avg.g},${avg.b},0.18)`);
+    halo.addColorStop(0.5, `rgba(${avg.r},${avg.g},${avg.b},0.06)`);
+    halo.addColorStop(1,   `rgba(${avg.r},${avg.g},${avg.b},0)`);
+    ctx.fillStyle = halo;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // PCB disc
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d1a0d';
+  ctx.fill();
+
+  // PCB rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(60,100,60,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // LEDs using LOGO_LEDS positions
+  const ledData = LOGO_LEDS.length === count ? LOGO_LEDS
+    : LOGO_LEDS.slice(0, Math.min(LOGO_LEDS.length, count));
+
+  for (let i = 0; i < ledData.length; i++) {
+    const led = ledData[i];
+    const lx = cx + led.x * coordScale;
+    const ly = cy + led.z * coordScale;
+    const lr = led.r * LED_DOT_SCALE * coordScale;
+    const c  = leds[i] || { r:0, g:0, b:0 };
+    if (c.r + c.g + c.b < 2) {
+      // Off LED — dim pad
+      ctx.beginPath();
+      ctx.arc(lx, ly, lr * 0.65, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(40,60,40,0.6)';
+      ctx.fill();
+      continue;
+    }
+    // Bloom glow
+    const bloomR = lr * 5.0;
+    const grd = ctx.createRadialGradient(lx, ly, 0, lx, ly, bloomR);
+    grd.addColorStop(0,   `rgba(${c.r},${c.g},${c.b},0.95)`);
+    grd.addColorStop(0.25, `rgba(${c.r},${c.g},${c.b},0.45)`);
+    grd.addColorStop(1,   `rgba(${c.r},${c.g},${c.b},0)`);
+    ctx.fillStyle = grd;
+    ctx.fillRect(lx - bloomR, ly - bloomR, bloomR * 2, bloomR * 2);
+    // LED core — very bright white-hot centre
+    ctx.beginPath();
+    ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${Math.min(255,c.r+150)},${Math.min(255,c.g+150)},${Math.min(255,c.b+150)})`;
+    ctx.fill();
+    // Tiny specular pinpoint
+    ctx.beginPath();
+    ctx.arc(lx - lr*0.3, ly - lr*0.3, lr * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fill();
+  }
+
+  // Frosted dome overlay — half-sphere illusion via radial gradient
+  const domeGrad = ctx.createRadialGradient(cx - R*0.2, cy - R*0.25, 0, cx, cy, R);
+  if (lit) {
+    domeGrad.addColorStop(0,   `rgba(${Math.min(255,avg.r+120)},${Math.min(255,avg.g+120)},${Math.min(255,avg.b+120)},0.12)`);
+    domeGrad.addColorStop(0.5, `rgba(${avg.r},${avg.g},${avg.b},0.07)`);
+    domeGrad.addColorStop(1,   'rgba(180,200,220,0.08)');
+  } else {
+    domeGrad.addColorStop(0,   'rgba(180,200,230,0.10)');
+    domeGrad.addColorStop(1,   'rgba(60,80,100,0.04)');
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = domeGrad;
+  ctx.fill();
+
+  // Dome edge ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(150,180,200,0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Specular highlight
+  ctx.beginPath();
+  ctx.arc(cx - R*0.28, cy - R*0.28, R*0.18, 0, Math.PI * 2);
+  const spec = ctx.createRadialGradient(cx - R*0.28, cy - R*0.28, 0, cx - R*0.28, cy - R*0.28, R*0.18);
+  spec.addColorStop(0, 'rgba(255,255,255,0.22)');
+  spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spec;
+  ctx.fill();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── 3D HUD ENGINE (Three.js) ──────────────────────────────────────────────
+let hud3d = null; // { renderer, scene, camera, mesh, ledPoints, animFrame }
+
+function init3DHud(dev) {
+  teardown3DHud();
+
+  const wrap = document.getElementById('hud-canvas-wrap');
+  const container = document.getElementById('hud-3d');
+  container.classList.add('active');
+  document.getElementById('hud-canvas').style.opacity = '0';
+
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x07070d, 1);
+  renderer.shadowMap.enabled = false;
+  container.appendChild(renderer.domElement);
+
+  // Badge
+  const badge = document.createElement('div');
+  badge.id = 'hud-3d-badge';
+  badge.textContent = '3D · DRAG TO ROTATE';
+  container.appendChild(badge);
+
+  // Scene + camera
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
+  camera.position.set(0, 2.2, 2.2);
+  camera.lookAt(0, 0, 0);
+
+  // Lighting — dim ambient, single top fill
+  scene.add(new THREE.AmbientLight(0x0d0d1a, 3));
+  const fill = new THREE.DirectionalLight(0x8899bb, 0.6);
+  fill.position.set(1, 4, 2);
+  scene.add(fill);
+
+  // ── PIVOT GROUP (drag rotates this) ──
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+
+  // ── HALF-SPHERE DOME ──
+  const domeGeo = new THREE.SphereGeometry(1, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+
+  // Lightmap canvas — painted each frame with LED colors projected onto dome UVs
+  const lmSize = 256;
+  const lmCanvas = document.createElement('canvas');
+  lmCanvas.width = lmSize; lmCanvas.height = lmSize;
+  const lmCtx = lmCanvas.getContext('2d');
+  const lmTexture = new THREE.CanvasTexture(lmCanvas);
+
+  const domeMat = new THREE.MeshPhysicalMaterial({
+    color: 0xaabbcc,
+    transparent: true,
+    opacity: 0.18,
+    roughness: 0.08,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    emissive: 0xffffff,
+    emissiveMap: lmTexture,
+    emissiveIntensity: 1.0,
+  });
+  const dome = new THREE.Mesh(domeGeo, domeMat);
+  pivot.add(dome);
+
+  // Dome rim ring (edge highlight)
+  const rimGeo = new THREE.TorusGeometry(1, 0.012, 12, 80);
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x445566, roughness: 0.4, metalness: 0.8 });
+  const rim = new THREE.Mesh(rimGeo, rimMat);
+  rim.rotation.x = Math.PI / 2;
+  pivot.add(rim);
+
+  // ── FLAT PCB DISC ──
+  const pcbGeo = new THREE.CylinderGeometry(0.96, 0.96, 0.03, 60);
+  const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0d1a0d, roughness: 0.8, metalness: 0.1 });
+  const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+  pcb.position.y = -0.015;
+  pivot.add(pcb);
+
+  // PCB trace rings (decorative circles etched on board)
+  const traceMat = new THREE.MeshBasicMaterial({ color: 0x1a3320, transparent: true, opacity: 0.7 });
+  [0.25, 0.5, 0.72, 0.88].forEach(r => {
+    const tg = new THREE.TorusGeometry(r, 0.004, 6, 48);
+    const t = new THREE.Mesh(tg, traceMat);
+    t.rotation.x = Math.PI / 2;
+    t.position.y = 0.016;
+    pivot.add(t);
+  });
+
+  // ── LED POSITIONS FROM LOGO (LOGO_LEDS, normalised unit circle) ──
+  const ledCount = Math.min(dev.ledCount || 30, LOGO_LEDS.length);
+  const ledMeshes = [];
+  const ledUVs = [];
+  const ledGlows = []; // billboard sprites for per-LED halo glow
+  const pcbRadius = 0.88;
+
+  // Shared glow sprite texture (white radial gradient, coloured via material at runtime)
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = 64; glowCanvas.height = 64;
+  const glowCtx = glowCanvas.getContext('2d');
+  const glowGrd = glowCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  glowGrd.addColorStop(0,    'rgba(255,255,255,1)');
+  glowGrd.addColorStop(0.15, 'rgba(255,255,255,0.8)');
+  glowGrd.addColorStop(0.5,  'rgba(255,255,255,0.25)');
+  glowGrd.addColorStop(1,    'rgba(255,255,255,0)');
+  glowCtx.fillStyle = glowGrd;
+  glowCtx.fillRect(0, 0, 64, 64);
+  const glowTex = new THREE.CanvasTexture(glowCanvas);
+
+  const glowMat = new THREE.SpriteMaterial({
+    map: glowTex,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  for (let i = 0; i < ledCount; i++) {
+    const pos = LOGO_LEDS[i];
+    const x = pos.x * pcbRadius;
+    const z = pos.z * pcbRadius;
+
+    const padGeo = new THREE.SphereGeometry(0.022, 12, 8);
+    const padMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: new THREE.Color(1, 0.42, 0.21),
+      emissiveIntensity: 9.0,
+      roughness: 0.1,
+      metalness: 0.0,
+    });
+    const led = new THREE.Mesh(padGeo, padMat);
+    led.position.set(x, 0.022, z);
+    pivot.add(led);
+    ledMeshes.push(led);
+
+    // Glow sprite — sits just above the LED
+    const glow = new THREE.Sprite(glowMat.clone());
+    glow.position.set(x, 0.04, z);
+    glow.scale.set(0.22, 0.22, 1);
+    pivot.add(glow);
+    ledGlows.push(glow);
+
+    // UV for lightmap projection onto dome
+    const r = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+    const phi = Math.atan2(pos.z, pos.x);
+    const polar = Math.atan2(r, 1.0);
+    const u = ((phi / (Math.PI * 2)) + 0.5 + 1.0) % 1.0;
+    const v = polar / (Math.PI / 2);
+    ledUVs.push({ u, v });
+  }
+
+  // Tilt pivot slightly — camera already provides top-down perspective
+  pivot.rotation.x = -0.1;
+
+  // ── DRAG ROTATION ──
+  let isDragging = false, prevX = 0, prevY = 0, velX = 0, velY = 0;
+  const getXY = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
+  const onDown = e => { isDragging = true; [prevX, prevY] = getXY(e); velX = velY = 0; };
+  const onMove = e => {
+    if (!isDragging) return;
+    const [cx, cy] = getXY(e);
+    velY = (cx - prevX) * 0.013;
+    velX = (cy - prevY) * 0.013;
+    prevX = cx; prevY = cy;
+    pivot.rotation.y += velY;
+    pivot.rotation.x = Math.max(-1.2, Math.min(0.3, pivot.rotation.x + velX));
+  };
+  const onUp = () => { isDragging = false; };
+  const onWheel = e => {
+    e.preventDefault();
+    const dist = camera.position.length();
+    const delta = e.deltaY * 0.002 * dist;
+    const newDist = Math.max(1.8, Math.min(6.0, dist + delta));
+    camera.position.normalize().multiplyScalar(newDist);
+  };
+  renderer.domElement.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+  renderer.domElement.addEventListener('touchstart', onDown, { passive: true });
+  window.addEventListener('touchmove', onMove, { passive: true });
+  window.addEventListener('touchend', onUp);
+
+  hud3d = {
+    renderer, scene, camera, pivot, ledMeshes, ledGlows, ledUVs,
+    lmCanvas, lmCtx, lmTexture, lmSize,
+    isDragging: false, velY: 0.004,
+    container,
+    _onMove: onMove, _onUp: onUp, _onWheel: onWheel, _domEl: renderer.domElement,
+  };
+
+  // Resize observer
+  hud3d.resizeObs = new ResizeObserver(() => {
+    if (!hud3d) return;
+    const W2 = wrap.clientWidth, H2 = wrap.clientHeight;
+    hud3d.camera.aspect = W2 / H2;
+    hud3d.camera.updateProjectionMatrix();
+    hud3d.renderer.setSize(W2, H2);
+  });
+  hud3d.resizeObs.observe(wrap);
+}
+
+function update3DHud(ds, dev) {
+  if (!hud3d) return;
+  const { renderer, scene, camera, pivot, ledMeshes, ledGlows, ledUVs,
+          lmCanvas, lmCtx, lmTexture, lmSize } = hud3d;
+
+  // Auto-rotate slowly around Y when not dragging
+  if (!hud3d.isDragging) {
+    pivot.rotation.y += hud3d.velY;
+  }
+
+  // Build LED colors for this frame
+  const count = ledMeshes.length;
+  const leds = ds.power ? buildLedColors(count, ds, hudTick) : new Array(count).fill({r:0,g:0,b:0});
+
+  // ── PAINT LIGHTMAP ──
+  // Clear to near-black
+  lmCtx.fillStyle = '#030308';
+  lmCtx.fillRect(0, 0, lmSize, lmSize);
+
+  for (let i = 0; i < count; i++) {
+    const c = leds[i];
+    if (c.r + c.g + c.b < 3) continue;
+    const uv = ledUVs[i];
+    const cx = uv.u * lmSize;
+    const cy = uv.v * lmSize;
+
+    // Bloom radius — larger for outer LEDs (more spread on dome surface)
+    const bloomR = (18 + uv.v * 28);
+
+    const grad = lmCtx.createRadialGradient(cx, cy, 0, cx, cy, bloomR);
+    const alpha = Math.min(1, (c.r + c.g + c.b) / (255 * 1.5));
+    grad.addColorStop(0,   `rgba(${c.r},${c.g},${c.b},${(alpha * 1.0).toFixed(2)})`);
+    grad.addColorStop(0.35,`rgba(${c.r},${c.g},${c.b},${(alpha * 0.6).toFixed(2)})`);
+    grad.addColorStop(1,   `rgba(${c.r},${c.g},${c.b},0)`);
+    lmCtx.fillStyle = grad;
+    lmCtx.fillRect(cx - bloomR, cy - bloomR, bloomR * 2, bloomR * 2);
+
+    // Wrap U — paint again offset by ±lmSize so edges tile seamlessly
+    for (const offset of [-lmSize, lmSize]) {
+      const grad2 = lmCtx.createRadialGradient(cx + offset, cy, 0, cx + offset, cy, bloomR);
+      grad2.addColorStop(0,   `rgba(${c.r},${c.g},${c.b},${(alpha * 1.0).toFixed(2)})`);
+      grad2.addColorStop(0.35,`rgba(${c.r},${c.g},${c.b},${(alpha * 0.6).toFixed(2)})`);
+      grad2.addColorStop(1,   `rgba(${c.r},${c.g},${c.b},0)`);
+      lmCtx.fillStyle = grad2;
+      lmCtx.fillRect(cx + offset - bloomR, cy - bloomR, bloomR * 2, bloomR * 2);
+    }
+  }
+
+  lmTexture.needsUpdate = true;
+
+  // Update LED mesh emissives + glow sprites
+  for (let i = 0; i < count; i++) {
+    const c = leds[i];
+    const col = new THREE.Color(c.r / 255, c.g / 255, c.b / 255);
+    const brightness = ds.power ? (c.r + c.g + c.b) / (255 * 3) : 0;
+    const intensity = brightness * 8.0;
+
+    ledMeshes[i].material.emissive.copy(col);
+    ledMeshes[i].material.emissiveIntensity = intensity;
+    ledMeshes[i].material.color.copy(col);
+
+    // Glow sprite — scale and colour by brightness
+    if (ledGlows[i]) {
+      ledGlows[i].material.color.copy(col);
+      ledGlows[i].material.opacity = brightness * 0.9;
+      const s = 0.12 + brightness * 0.28;
+      ledGlows[i].scale.set(s, s, 1);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+function teardown3DHud() {
+  if (!hud3d) return;
+  hud3d.resizeObs?.disconnect();
+  if (hud3d._onMove) window.removeEventListener('mousemove', hud3d._onMove);
+  if (hud3d._onUp)   { window.removeEventListener('mouseup', hud3d._onUp); window.removeEventListener('touchend', hud3d._onUp); window.removeEventListener('touchmove', hud3d._onMove); }
+  if (hud3d._onWheel && hud3d._domEl) hud3d._domEl.removeEventListener('wheel', hud3d._onWheel);
+  hud3d.lmTexture?.dispose();
+  hud3d.renderer.dispose();
+  const container = document.getElementById('hud-3d');
+  container.classList.remove('active');
+  container.innerHTML = '';
+  document.getElementById('hud-canvas').style.opacity = '1';
+  hud3d = null;
+}
+
+function toggleHudView() {
+  if (!state.devices[state.active]) return;
+  const dev = state.devices[state.active];
+  const btn = document.getElementById('hud-view-toggle');
+  if (hudFixture === '3d') {
+    // Switch to 2D
+    teardown3DHud();
+    const typeLC = dev.type.toLowerCase();
+    if (typeLC.includes('orb') || typeLC.includes('bulb') || typeLC.includes('diffuser')) setFixture('bulb');
+    else if (typeLC.includes('ring')) setFixture('ring');
+    else setFixture('strip');
+    btn.textContent = '3D';
+  } else {
+    // Switch to 3D
+    setFixture('3d');
+    init3DHud(dev);
+    btn.textContent = '2D';
+  }
+  btn.style.display = 'block';
+}
+
+function startHud() {
+  if (hudAnimFrame) cancelAnimationFrame(hudAnimFrame);
+  hudTick = 0;
+  drawHud();
+}
+
+// ── UPDATE HUD POWER STATS ──────────────────────────────────────────────────
+function updatePowerDisplay() {
+  if (state.active === null) return;
+  const dev = state.devices[state.active];
+  const ds  = deviceState[dev.id];
+  const p   = calcPower(ds, dev);
+  if (!p) return;
+
+  const pctClass = p.pct > 80 ? 'crit' : p.pct > 50 ? 'warn' : 'hi';
+
+  const set = (id, val, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    el.className = 'hud-stat-val' + (cls ? ' ' + cls : '');
+  };
+  set('hstat-ma', p.maDraw, pctClass);
+  set('hstat-w',  p.watts + 'W', pctClass);
+
+  // Battery time remaining
+  const battWrap = document.getElementById('hstat-batt-wrap');
+  if (battWrap) {
+    if (dev.hasBattery && dev.batteryMah && p.maDraw > 0) {
+      battWrap.style.display = '';
+      const battPct = ds.battery !== undefined ? ds.battery / 100 : 1.0;
+      const remainMah = dev.batteryMah * battPct;
+      const hoursLeft = remainMah / p.maDraw;
+      let timeStr;
+      if (hoursLeft >= 1) timeStr = hoursLeft.toFixed(1) + 'h';
+      else timeStr = Math.round(hoursLeft * 60) + 'm';
+      const cls = hoursLeft < 0.5 ? 'crit' : hoursLeft < 1.5 ? 'warn' : 'hi';
+      set('hstat-batt-time', timeStr, cls);
+    } else {
+      battWrap.style.display = 'none';
+    }
+  }
+
+  const gauge = document.getElementById('hud-gauge-fill');
+  if (gauge) {
+    gauge.style.width = p.pct + '%';
+    gauge.style.background = p.pct > 80
+      ? '#ff5577' : p.pct > 50
+      ? '#f0c040' : 'var(--connected)';
+  }
+  const maxLabel = document.getElementById('hstat-max');
+  if (maxLabel) {
+    const maxW = Math.round(dev.ledCount * MA_PER_LED_MAX / 1000 * dev.voltage * 10) / 10;
+    maxLabel.textContent = maxW + 'W max';
+  }
+
+  const lbl = document.getElementById('hud-device-label');
+  if (lbl) lbl.textContent = dev.name.toUpperCase();
+}
+// ── MOCK FIXTURE JSON (embedded — in production these are fetched from the device URI) ──
+const MOCK_FIXTURE_DATA = {
+  'https://bleam.local/fixture/bias-light.json': {
+    "name": "Bias Light",
+    "canvas": { "width": 400, "height": 200 },
+    "segments": [
+      {
+        "name": "Top",    "count": 30, "color": "#ff6b35",
+        "path": "line", "x1": 20,  "y1": 10,  "x2": 380, "y2": 10
+      },
+      {
+        "name": "Right",  "count": 20, "color": "#7b5cfa",
+        "path": "line", "x1": 390, "y1": 10,  "x2": 390, "y2": 190
+      },
+      {
+        "name": "Bottom", "count": 30, "color": "#3dffc0",
+        "path": "line", "x1": 380, "y1": 190, "x2": 20,  "y2": 190
+      },
+      {
+        "name": "Left",   "count": 20, "color": "#f0c040",
+        "path": "line", "x1": 10,  "y1": 190, "x2": 10,  "y2": 10
+      }
+    ]
+  },
+  'https://bleam.local/fixture/cabinet-glow.json': {
+    "name": "Cabinet Glow",
+    "canvas": { "width": 300, "height": 200 },
+    "segments": [
+      {
+        "name": "Ring A", "count": 16, "color": "#ff6b35",
+        "path": "ring", "cx": 100, "cy": 100, "r": 60
+      },
+      {
+        "name": "Ring B", "count": 14, "color": "#7b5cfa",
+        "path": "ring", "cx": 220, "cy": 80,  "r": 45
+      }
+    ]
+  }
+};
+
+// ── FIXTURE JSON SCHEMA ─────────────────────────────────────────────────────
+// A fixture JSON file has this structure:
+//
+// {
+//   "name": "My Fixture",
+//   "canvas": { "width": 400, "height": 200 },   // logical coordinate space
+//   "segments": [
+//     {
+//       "name": "Top strip",
+//       "count": 30,
+//       "color": "#ff6b35",            // display tint in editor (not used for live colour)
+//       "path": "line",                // "line" | "ring" | "points"
+//       // line:   x1,y1 → x2,y2
+//       "x1": 20, "y1": 10, "x2": 380, "y2": 10
+//       // ring:   cx,cy,r
+//       // "cx": 100, "cy": 100, "r": 60
+//       // points: explicit array
+//       // "points": [ [x,y], ... ]
+//     }
+//   ]
+// }
+
+// Expand a segment definition into an array of {x,y} positions
+function expandSegment(seg, cw, ch) {
+  const pts = [];
+  if (seg.path === 'line' || (!seg.path && seg.x1 !== undefined)) {
+    const n = seg.count;
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) : 0;
+      pts.push({ x: seg.x1 + t * (seg.x2 - seg.x1), y: seg.y1 + t * (seg.y2 - seg.y1) });
+    }
+  } else if (seg.path === 'ring') {
+    const { cx, cy, r, count: n } = seg;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+    }
+  } else if (seg.path === 'points' && Array.isArray(seg.points)) {
+    seg.points.forEach(([x, y]) => pts.push({ x, y }));
+  }
+  return pts;
+}
+
+// Parse raw fixture JSON into the internal layout format
+function parseFixtureJson(json) {
+  const cw = json.canvas?.width  || 400;
+  const ch = json.canvas?.height || 200;
+  return (json.segments || []).map(seg => ({
+    name:      seg.name  || 'Segment',
+    count:     seg.count || 0,
+    color:     seg.color || '#ff6b35',
+    positions: expandSegment(seg, cw, ch),
+    canvasW:   cw,
+    canvasH:   ch,
+  }));
+}
+
+// Called during GATT connect — reads URI from BLE char, fetches JSON, stores on device entry
+async function fetchFixtureLayout(devId, uri, devIdx) {
+  log(`Fetching fixture definition from ${uri} …`, 'info');
+  try {
+    let json;
+    // In production: const res = await fetch(uri); json = await res.json();
+    // Mock: serve from embedded data with a short simulated delay
+    await delay(600);
+    const mockData = MOCK_FIXTURE_DATA[uri];
+    if (!mockData) throw new Error('Fixture URI not found in mock data');
+    json = mockData;
+
+    const layout = parseFixtureJson(json);
+    const entry  = state.devices[devIdx];
+    if (!entry) return;
+    entry.fixtureLayout = layout;
+    entry.fixtureUri    = uri;
+
+    const total = layout.reduce((s, seg) => s + seg.count, 0);
+    log(`Fixture loaded: "${json.name}" — ${layout.length} segments, ${total} LEDs`, 'ok');
+    toast(`Fixture loaded: ${json.name}`);
+
+    // If this device is still active, switch to custom view
+    if (state.active === devIdx) setFixture('custom');
+  } catch (err) {
+    log(`Fixture fetch failed: ${err.message}`, 'err');
+  }
+}
+
+// Draw the custom fixture layout for the currently active device
+function drawCustomFixture(ctx, W, H, leds) {
+  const dev = state.active !== null ? state.devices[state.active] : null;
+  const layout = dev?.fixtureLayout;
+
+  if (!layout || layout.length === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.font = '10px DM Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('No fixture definition — device did not provide a URI', W / 2, H / 2 - 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillText('Fixture JSON is read from the device over BLE on connect', W / 2, H / 2 + 10);
+    ctx.textAlign = 'left';
+    return;
+  }
+
+  // Scale from fixture's logical canvas to the HUD canvas
+  const cw = layout[0].canvasW || 400;
+  const ch = layout[0].canvasH || 200;
+  const sx = W / cw;
+  const sy = H / ch;
+
+  let ledIdx = 0;
+  layout.forEach(seg => {
+    seg.positions.forEach(p => {
+      if (ledIdx >= leds.length) return;
+      const c  = leds[ledIdx++];
+      const px = p.x * sx;
+      const py = p.y * sy;
+      // Bloom glow when lit
+      if (c.r + c.g + c.b > 8) {
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, 9);
+        grd.addColorStop(0, `rgba(${c.r},${c.g},${c.b},0.35)`);
+        grd.addColorStop(1, 'transparent');
+        ctx.fillStyle = grd;
+        ctx.fillRect(px - 9, py - 9, 18, 18);
+      }
+      // LED dot
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
+      ctx.fill();
+    });
+  });
+}
+
+let cycleTimer = null;
+let cycleProgress = 0;
+let cycleBarTimer = null;
+
+function toggleAutoCycle() {
+  if (state.active === null) return;
+  const ds = deviceState[state.devices[state.active].id];
+  ds.autoCycle = !ds.autoCycle;
+  document.getElementById('cycle-toggle').classList.toggle('on', ds.autoCycle);
+  document.getElementById('cycle-body').classList.toggle('enabled', ds.autoCycle);
+  if (ds.autoCycle) {
+    startCycleTimer(ds);
+    log(`Auto cycle ON — every ${ds.cycleInterval}s`, 'info');
+  } else {
+    stopCycleTimer();
+    log('Auto cycle OFF', 'info');
+  }
+  mockWrite('AUTO_CYCLE', new Uint8Array([ds.autoCycle ? 1 : 0, ds.cycleInterval]));
+}
+
+function adjustCycle(delta) {
+  if (state.active === null) return;
+  const ds = deviceState[state.devices[state.active].id];
+  ds.cycleInterval = Math.max(5, Math.min(300, ds.cycleInterval + delta));
+  document.getElementById('cycle-val').textContent = ds.cycleInterval + 's';
+  if (ds.autoCycle) { stopCycleTimer(); startCycleTimer(ds); }
+  mockWrite('CYCLE_INTERVAL', new Uint8Array([ds.cycleInterval]));
+}
+
+function startCycleTimer(ds) {
+  cycleProgress = 0;
+  updateCycleBar(0);
+  const totalMs = ds.cycleInterval * 1000;
+  const tickMs = 200;
+  cycleBarTimer = setInterval(() => {
+    cycleProgress = Math.min(100, cycleProgress + (tickMs / totalMs * 100));
+    updateCycleBar(cycleProgress);
+    if (cycleProgress >= 100) {
+      cycleProgress = 0;
+      // Advance to next effect slot
+      const cur = fxSlots.findIndex(s => s.mode === state.effect);
+      const next = fxSlots[(cur + 1) % fxSlots.length];
+      if (next) setEffectByMode(next.mode, next.name);
+    }
+  }, tickMs);
+}
+
+function stopCycleTimer() {
+  clearInterval(cycleBarTimer); cycleBarTimer = null;
+  updateCycleBar(0);
+}
+
+function updateCycleBar(pct) {
+  const el = document.getElementById('cycle-bar');
+  if (el) el.style.width = pct + '%';
+}
+
+// ── AUDIO RESPONSIVE ───────────────────────────────────────────────────────
+function toggleAudio() {
+  if (state.active === null) return;
+  const dev = state.devices[state.active];
+  if (!dev.hasAudio) return;
+  const ds = deviceState[dev.id];
+  ds.audioResponsive = !ds.audioResponsive;
+  document.getElementById('audio-toggle').classList.toggle('on', ds.audioResponsive);
+  document.getElementById('audio-body').classList.toggle('enabled', ds.audioResponsive);
+  log(`Audio reactive ${ds.audioResponsive ? 'ON' : 'OFF'}`, 'info');
+  mockWrite('AUDIO_REACTIVE', new Uint8Array([ds.audioResponsive ? 1 : 0]));
+}
+
+function onAudioSensChange(val) {
+  if (state.active === null) return;
+  const ds = deviceState[state.devices[state.active].id];
+  ds.audioSensitivity = parseInt(val);
+  const pct = Math.round(ds.audioSensitivity / 255 * 100);
+  document.getElementById('audio-sens-val').textContent = pct + '%';
+  mockWrite('AUDIO_SENS', new Uint8Array([ds.audioSensitivity]));
+}
+
+function setAudioMode(btn) {
+  document.querySelectorAll('.audio-mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (state.active === null) return;
+  const ds = deviceState[state.devices[state.active].id];
+  ds.audioMode = parseInt(btn.dataset.amode);
+  const names = ['PULSE', 'SPECTRUM', 'BEAT'];
+  log(`Audio mode → ${names[ds.audioMode]}`, 'info');
+  mockWrite('AUDIO_MODE', new Uint8Array([ds.audioMode]));
+}
+
+// ── POWER USAGE ────────────────────────────────────────────────────────────
+// WS2812B: ~60mA/LED at full white; typical usage ~20mA average per LED
+const MA_PER_LED_MAX = 60;
+const MA_PER_LED_IDLE = 1; // quiescent
+
+function calcPower(ds, dev) {
+  if (!dev || !ds) return null;
+  const brightness = ds.power ? ds.brightness : 0;
+  const bPct = brightness / 255;
+  // Estimate active LEDs based on effect type (some effects only light a fraction)
+  const partialEffects = new Set([13,14,16,17,30,31,32,33,34,35,36,37,38,43,44,63,72]); // scan/chase/comet etc
+  const activeFraction = partialEffects.has(ds.effect) ? 0.35 : ds.effect === 0 ? 1.0 : 0.65;
+  const [r,g,b] = hexToRgb(ds.color);
+  const colorFraction = (r + g + b) / (255 * 3);
+  const maDraw = Math.round(
+    dev.ledCount * MA_PER_LED_IDLE +
+    dev.ledCount * activeFraction * colorFraction * bPct * MA_PER_LED_MAX
+  );
+  const maxMa = dev.ledCount * MA_PER_LED_MAX;
+  const watts = ((maDraw * dev.voltage) / 1000).toFixed(2);
+  const pct = Math.round(maDraw / maxMa * 100);
+  const litLeds = Math.round(dev.ledCount * activeFraction * bPct);
+  return { maDraw, maxMa, watts, pct, litLeds, totalLeds: dev.ledCount };
+}
+
+// old updatePowerDisplay replaced — now lives in HUD engine above
+// keeping calcPower here as it's shared
+
+// ── ADVANCED CONTROLS SYNC ─────────────────────────────────────────────────
+function syncAdvancedControls(idx) {
+  const dev = state.devices[idx];
+  const ds  = deviceState[dev.id];
+
+  // Auto cycle
+  document.getElementById('cycle-toggle').classList.toggle('on', ds.autoCycle);
+  document.getElementById('cycle-body').classList.toggle('enabled', ds.autoCycle);
+  document.getElementById('cycle-val').textContent = ds.cycleInterval + 's';
+  stopCycleTimer();
+  if (ds.autoCycle) startCycleTimer(ds);
+
+  const audioSupported = dev.hasAudio;
+  const audioBlock = document.getElementById('audio-block');
+  if (audioBlock) audioBlock.style.display = audioSupported ? '' : 'none';
+  if (!audioSupported) {
+    ds.audioResponsive = false;
+    document.getElementById('audio-body').classList.remove('enabled');
+  } else {
+    const audioToggle = document.getElementById('audio-toggle');
+    audioToggle.classList.toggle('on', ds.audioResponsive);
+    document.getElementById('audio-body').classList.toggle('enabled', ds.audioResponsive);
+  }
+  document.getElementById('audio-sensitivity').value = ds.audioSensitivity;
+  document.getElementById('audio-sens-val').textContent = Math.round(ds.audioSensitivity / 255 * 100) + '%';
+  document.querySelectorAll('.audio-mode-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.amode) === ds.audioMode)
+  );
+
+  // Power
+  updatePowerDisplay();
+}
+function toggleMobileMenu() {
+  document.getElementById('mobile-menu').classList.toggle('open');
+}
+
+// ── RESPONSIVE HEADER ─────────────────────────────────────────────────────
+const MOBILE_BP = 520;
+function applyHeaderMode() {
+  const mobile = window.innerWidth < MOBILE_BP;
+  document.querySelector('header').classList.toggle('mobile', mobile);
+  // close mobile menu if we've resized back to desktop
+  if (!mobile) document.getElementById('mobile-menu').classList.remove('open');
+}
+window.addEventListener('resize', applyHeaderMode);
+applyHeaderMode();
+
+// ── SCAN BUTTON GLOW ──────────────────────────────────────────────────────
+function setScanGlow(active) { /* scan button removed from header */ }
+
+function updateStatusBar(connected, name='') {
+  document.getElementById('status-dot').classList.toggle('connected', connected);
+  document.getElementById('status-text').textContent = connected ? name.toUpperCase() : 'NO DEVICE';
+  // sync mobile menu status
+  const mDot  = document.getElementById('mobile-status-dot');
+  const mText = document.getElementById('mobile-status-text');
+  if (mDot)  mDot.classList.toggle('connected', connected);
+  if (mText) mText.textContent = connected ? name.toUpperCase() : 'NO DEVICE';
+}
+
+let logCount = 0;
+
+function toggleLog() {
+  document.getElementById('log-accordion').classList.toggle('open');
+}
+
+function toggleSettings() {
+  document.getElementById('settings-accordion').classList.toggle('open');
+}
+
+function log(msg, type='info') {
+  const inner = document.getElementById('ble-log-inner');
+  const logEl  = document.getElementById('ble-log');
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-${type}">${msg}</span>`;
+  inner.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+
+  // Update count badge
+  logCount++;
+  document.getElementById('log-count').textContent = logCount;
+
+  // Auto-open on errors
+  if (type === 'err') document.getElementById('log-accordion').classList.add('open');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+renderEffectGrid();
+startHud();
+log('Hyphi Hub ready — click SCAN to find devices', 'info');
+</script>
+</body>
+</html>
