@@ -265,6 +265,19 @@ export const useDeviceStore = defineStore('devices', () => {
     _debouncedWrite<string>(id, 'setColor', 60)(hex)
   }
 
+  function setColor2(id: string, hex: string): void {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.color2 = hex
+    // color2 is UI-only unless firmware supports it
+  }
+
+  function setColor3(id: string, hex: string): void {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.color3 = hex
+  }
+
   function setMode(id: string, mode: number): void {
     const dev = _device(id)
     if (!dev) return
@@ -329,6 +342,8 @@ export const useDeviceStore = defineStore('devices', () => {
     togglePower,
     setBrightness,
     setColor,
+    setColor2,
+    setColor3,
     setMode,
     setSpeed,
     setAutoCycle,

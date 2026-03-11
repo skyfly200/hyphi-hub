@@ -84,11 +84,13 @@ export class DeviceHandle implements IDeviceHandle {
   private async _write(key: CharKey, bytes: Uint8Array): Promise<void> {
     const char = this.chars[key]
     if (!char) {
-      console.warn(`[BLE] char "${key}" not found — skipping write`)
+      console.warn(`[BLE] char "${key}" not found — available:`, Object.keys(this.chars).filter(k => !!(this.chars as any)[k]))
       return
     }
     try {
+      console.log(`[BLE] write "${key}" →`, Array.from(bytes))
       await char.writeValueWithoutResponse(bytes)
+      console.log(`[BLE] write "${key}" ✓`)
     } catch (err) {
       console.error(`[BLE] write "${key}" failed:`, err)
       throw err
