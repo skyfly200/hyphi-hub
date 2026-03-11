@@ -4,7 +4,6 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Ref } from 'vue'
 
 import {
   connectDevice,
@@ -25,7 +24,7 @@ export interface LogEntry {
 
 export interface DeviceEntry {
   info:          DeviceInfo
-  state:         Ref<DeviceState>
+  state:         DeviceState
   handle:        IDeviceHandle
   logs:          LogEntry[]
   _pollInterval: ReturnType<typeof setInterval> | null
@@ -53,7 +52,7 @@ export const useDeviceStore = defineStore('devices', () => {
   )
 
   const connectedCount = computed<number>(() =>
-    devices.value.filter(d => d.state?.value?.connected).length
+    devices.value.filter(d => d.state?.connected).length
   )
 
   // ── Logging ──────────────────────────────────────────────────────────────
@@ -149,7 +148,7 @@ export const useDeviceStore = defineStore('devices', () => {
       firmware:        result.initialState.firmware        ?? 'Unknown',
     }
 
-    const devState = ref<DeviceState>(fullState)
+    const devState: DeviceState = { ...fullState }
 
     // Poll notification-driven keys from handle.state every 2 s
     const notifyKeys: (keyof DeviceState)[] = ['battery', 'current', 'temp', 'connected']
@@ -157,7 +156,7 @@ export const useDeviceStore = defineStore('devices', () => {
       const raw = result.handle.state
       notifyKeys.forEach(k => {
         const v = raw[k]
-        if (v !== undefined) (devState.value as Record<string, unknown>)[k] = v
+        if (v !== undefined) (devState as Record<string, unknown>)[k] = v
       })
     }, 2_000)
 
@@ -193,10 +192,10 @@ export const useDeviceStore = defineStore('devices', () => {
     const dev = devices.value[idx]
     dev.handle.disconnect()
     if (dev._pollInterval) clearInterval(dev._pollInterval)
-    dev.state.value.connected = false
+    dev.state.connected = false
     log(`Disconnected: ${dev.info.name}`, 'err', id)
     if (activeId.value === id) {
-      const next = devices.value.find((d, i) => i !== idx && d.state.value.connected)
+      const next = devices.value.find((d, i) => i !== idx && d.state.connected)
       activeId.value = next?.info.id ?? null
     }
   }
@@ -216,7 +215,7 @@ export const useDeviceStore = defineStore('devices', () => {
         dev.handle as import('@/composables/useBLE').DeviceHandle,
         (msg, type) => log(msg, type, id)
       )
-      dev.state.value.connected = true
+      dev.state.connected = true
     } catch (err) {
       log(`Reconnect failed: ${(err as Error).message}`, 'err', id)
     }
@@ -247,64 +246,64 @@ export const useDeviceStore = defineStore('devices', () => {
   async function togglePower(id: string): Promise<void> {
     const dev = _device(id)
     if (!dev) return
-    const next = !dev.state.value.power
-    dev.state.value.power = next
+    const next = !dev.state.power
+    dev.state.power = next
     await dev.handle.setPower(next)
   }
 
   function setBrightness(id: string, val: number): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.brightness = val
+    dev.state.brightness = val
     _debouncedWrite<number>(id, 'setBrightness')(val)
   }
 
   function setColor(id: string, hex: string): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.color = hex
+    dev.state.color = hex
     _debouncedWrite<string>(id, 'setColor', 60)(hex)
   }
 
   function setMode(id: string, mode: number): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.mode = mode
+    dev.state.mode = mode
     void dev.handle.setMode(mode)
   }
 
   function setSpeed(id: string, val: number): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.speed = val
+    dev.state.speed = val
     _debouncedWrite<number>(id, 'setSpeed')(val)
   }
 
   async function setAutoCycle(id: string, on: boolean): Promise<void> {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.autoCycle = on
+    dev.state.autoCycle = on
     await dev.handle.setAutoCycle(on)
   }
 
   function setCycleTime(id: string, secs: number): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.cycleTime = secs
+    dev.state.cycleTime = secs
     _debouncedWrite<number>(id, 'setCycleTime', 200)(secs)
   }
 
   async function setAudioReactive(id: string, on: boolean): Promise<void> {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.audioReactive = on
+    dev.state.audioReactive = on
     await dev.handle.setAudioReactive(on)
   }
 
   function setDamping(id: string, val: number): void {
     const dev = _device(id)
     if (!dev) return
-    dev.state.value.damping = val
+    dev.state.damping = val
     _debouncedWrite<number>(id, 'setDamping')(val)
   }
 
