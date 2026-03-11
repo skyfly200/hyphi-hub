@@ -53,7 +53,7 @@ export const useDeviceStore = defineStore('devices', () => {
   )
 
   const connectedCount = computed<number>(() =>
-    devices.value.filter(d => d.state.value.connected).length
+    devices.value.filter(d => d.state?.value?.connected).length
   )
 
   // ── Logging ──────────────────────────────────────────────────────────────

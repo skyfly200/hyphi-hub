@@ -106,8 +106,9 @@ const emit  = defineEmits(['update:modelValue'])
 
 const store = useDeviceStore()
 const activeMethod = ref('ble')
-const connecting   = ref(false)
-const scanningQR   = ref(false)
+const connecting    = ref(false)
+const scanning      = ref(false)
+const scanningQR    = ref(false)
 const nfcReading   = ref(false)
 const bleStatusText = ref('Click SCAN to open device picker')
 const qrHint       = ref('Point camera at the QR code on your device')
@@ -139,10 +140,9 @@ const methods = [
 async function startBLEScan() {
   if (connecting.value) return
   connecting.value = true
+  scanning.value = true
   bleStatusText.value = 'Opening device picker…'
   try {
-    // requestBLEDevice() calls requestDevice() — must be first await with no
-    // prior async calls, so Chrome still has the user gesture context.
     const bleDevice = await requestBLEDevice((msg, type) => store.log(msg, type))
     if (!bleDevice) {
       bleStatusText.value = 'Scan cancelled'
@@ -158,6 +158,7 @@ async function startBLEScan() {
     bleStatusText.value = `Error: ${(e as Error).message}`
   } finally {
     connecting.value = false
+    scanning.value = false
   }
 }
 

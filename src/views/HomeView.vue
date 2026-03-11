@@ -131,11 +131,11 @@
           <button class="drawer-close" @click="drawerOpen = false">✕</button>
         </div>
         <div class="devices-grid">
+          <template v-for="dev in store.devices" :key="dev.info.id">
           <div
-            v-for="dev in store.devices"
-            :key="dev.info.id"
+            v-if="dev.state"
             class="device-card"
-            :class="{ active: store.activeId === dev.info.id, offline: !dev.state.value.connected }"
+            :class="{ active: store.activeId === dev.info.id, offline: !connected }"
             @click="selectDevice(dev.info.id)"
           >
             <div class="device-card-top">
@@ -143,12 +143,12 @@
               <div class="device-card-type">{{ dev.info.type }}</div>
             </div>
             <div class="device-card-bottom">
-              <span class="device-status-dot" :class="dev.state.value.connected ? 'on' : 'off'" />
-              <span class="device-card-batt" v-if="dev.info.hasBattery && dev.state.value.battery !== null">
-                {{ Math.round(dev.state.value.battery) }}%
+              <span class="device-status-dot" :class="connected ? 'on' : 'off'" />
+              <span class="device-card-batt" v-if="dev.info.hasBattery && battery != null">
+                {{ Math.round(battery!) }}%
               </span>
               <button
-                v-if="dev.state.value.connected"
+                v-if="connected"
                 class="btn-disconnect"
                 @click.stop="store.disconnect(dev.info.id)"
               >DC</button>
@@ -159,6 +159,7 @@
               >RECONNECT</button>
             </div>
           </div>
+          </template>
           <button class="device-card-add" @click="showScan = true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>
             ADD DEVICE
@@ -416,7 +417,7 @@ if (typeof window !== 'undefined') {
 
 const connectedCount = computed(() => store.connectedCount)
 const activeDev      = computed(() => store.activeDevice)
-const ds             = computed(() => activeDev.value?.state?.value || {} as import('@/ble-protocol').DeviceState)
+const ds             = computed(() => activeDev.value?.state || {} as import('@/ble-protocol').DeviceState)
 const statusName     = computed(() => activeDev.value?.info.name ?? '')
 
 const speedLabel = computed(() => {
