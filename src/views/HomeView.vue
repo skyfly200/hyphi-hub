@@ -63,9 +63,11 @@
           <span class="status-dot" :class="{ connected: store.connectedCount > 0 }"></span>
           <span class="status-text">{{ store.connectedCount > 0 ? (activeDev?.info.name.toUpperCase() ?? 'CONNECTED') : 'NO DEVICE' }}</span>
         </div>
-        <button class="btn-scan" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="openScan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
-          SCAN
+        <!-- devices drawer trigger -->
+        <button class="btn-devices" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="drawerOpen = true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
+          <span class="btn-label">DEVICES</span>
+          <span class="devices-count" v-if="store.devices.length > 0">{{ store.devices.length }}</span>
         </button>
       </div>
       <button class="hamburger" @click="mobileMenuOpen = !mobileMenuOpen">
@@ -92,36 +94,49 @@
       </div>
     </div>
 
-    <main>
-      <!-- ── Devices grid ── -->
-      <div class="section-label">DEVICES</div>
-      <div class="devices-grid">
-        <template v-for="dev in store.devices" :key="dev.info.id">
-          <div class="device-card" :class="{ active: dev.info.id === store.activeId }" @click="store.setActive(dev.info.id)">
-            <div class="device-name">
-              {{ dev.info.name }}
-              <span class="device-badge">{{ dev.info.type }}</span>
-              <div class="device-color-preview" :style="{ background: dev.state?.color ?? '#ff6b35' }"></div>
+    <!-- devices drawer and overlay -->
+    <div class="drawer-overlay" :class="{ open: drawerOpen }" @click="drawerOpen = false"></div>
+    <div class="devices-drawer" :class="{ open: drawerOpen }">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-title">DEVICES</div>
+          <div class="drawer-sub" v-if="store.devices.length === 0">No devices connected</div>
+        </div>
+        <button class="drawer-close" @click="drawerOpen = false">✕</button>
+      </div>
+      <div id="devices-grid">
+        <template v-if="store.devices.length > 0">
+          <template v-for="dev in store.devices" :key="dev.info.id">
+            <div class="device-card" :class="{ active: dev.info.id === store.activeId }" @click="store.setActive(dev.info.id)">
+              <div class="device-name">
+                {{ dev.info.name }}
+                <span class="device-badge">{{ dev.info.type }}</span>
+                <div class="device-color-preview" :style="{ background: dev.state?.color ?? '#ff6b35' }"></div>
+              </div>
+              <div class="device-id">{{ dev.info.id.slice(0, 22) }}</div>
+              <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span class="status-dot" :class="{ connected: dev.state?.connected }"></span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">{{ dev.state?.connected ? 'CONNECTED' : 'DISCONNECTED' }}</span>
+                <button v-if="!dev.state?.connected" class="btn-reconnect" @click.stop="store.reconnect(dev.info.id)">RECONNECT</button>
+                <button class="btn-remove" @click.stop="store.removeDevice(dev.info.id)">✕</button>
+              </div>
             </div>
-            <div class="device-id">{{ dev.info.id.slice(0, 22) }}</div>
-            <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <span class="status-dot" :class="{ connected: dev.state?.connected }"></span>
-              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">{{ dev.state?.connected ? 'CONNECTED' : 'DISCONNECTED' }}</span>
-              <button v-if="!dev.state?.connected" class="btn-reconnect" @click.stop="store.reconnect(dev.info.id)">RECONNECT</button>
-              <button class="btn-remove" @click.stop="store.removeDevice(dev.info.id)">✕</button>
-            </div>
-          </div>
+          </template>
         </template>
-        <div v-if="store.devices.length === 0" class="empty-state">
+        <div v-else class="empty-state">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
-          <p>NO DEVICES CONNECTED</p>
-          <button class="btn-scan pulse-glow" style="margin-top:8px;" @click="openScan">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
-            SCAN FOR DEVICES
-          </button>
+          <p>SCAN TO DISCOVER DEVICES</p>
         </div>
       </div>
+      <div class="drawer-footer">
+        <button class="btn-scan-drawer" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="openScan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
+          ADD DEVICE
+        </button>
+      </div>
+    </div>
 
+    <main>
       <!-- ── Control panel ── -->
       <div v-if="activeDev" class="control-panel-wrap">
 
@@ -302,7 +317,7 @@
 
     </main>
 
-    <ScanModal :open="scanOpen" @close="scanOpen = false" @connected="scanOpen = false" />
+    <ScanModal v-model="scanOpen" @connected="scanOpen = false" />
     <div class="toast" :class="{ show: toastVisible }">{{ toastMsg }}</div>
   </div>
 </template>
@@ -316,6 +331,7 @@ import type { DeviceState } from '@/ble-protocol'
 const store = useDeviceStore()
 const isMobile        = ref(window.innerWidth < 520)
 const scanOpen        = ref(false)
+const drawerOpen      = ref(false)
 const mobileMenuOpen  = ref(false)
 const logOpen         = ref(false)
 const toastVisible    = ref(false)
@@ -325,6 +341,12 @@ window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 5
 
 function openScan() { scanOpen.value = true }
 function toast(msg: string) { toastMsg.value = msg; toastVisible.value = true; setTimeout(() => { toastVisible.value = false }, 2800) }
+
+// when the scan modal is shown hide the drawer so it isn't layered
+watch(scanOpen, open => { if (open) drawerOpen.value = false })
+
+// close drawer automatically when first device appears
+watch(() => store.connectedCount, cnt => { if (cnt > 0) drawerOpen.value = false })
 
 // ── Active device ──────────────────────────────────────────────────────────
 const activeDev = computed(() => store.activeDevice)
@@ -659,22 +681,48 @@ onUnmounted(()=>{
 
 <style>
 /* global reset applies to document root so white body margin/background won't peek through */
+:root {
+  --bg:        #0a0a0f;
+  --surface:   #111118;
+  --panel:     #16161f;
+  --border:    #2a2a3a;
+  --muted:     #3a3a50;
+  --text:      #e8e8f0;
+  --sub:       #7a7a9a;
+  --accent:    #ff6b35;
+  --accent2:   #7b5cfa;
+  --glow:      rgba(255,107,53,0.18);
+  --glow2:     rgba(123,92,250,0.15);
+  --connected: #3dffc0;
+  --r: 8px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 html, body {
   margin: 0;
   padding: 0;
-  background: #0a0a0f;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20256%20256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
 }
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
 
-.app-shell{background:#0a0a0f;color:#e8e8f0;font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
-
-/* ── CSS custom props ── */
-.app-shell{
-  --bg:#0a0a0f;--surface:#111118;--panel:#16161f;--border:#2a2a3a;--muted:#3a3a50;
-  --text:#e8e8f0;--sub:#7a7a9a;--accent:#ff6b35;--accent2:#7b5cfa;
-  --glow:rgba(255,107,53,0.18);--glow2:rgba(123,92,250,0.15);--connected:#3dffc0;--r:8px;
-}
+.app-shell{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -710,6 +758,118 @@ header.mobile{padding:12px 16px;}
 .btn-scan.pulse-glow::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--r) + 1px);background:conic-gradient(from var(--glow-angle),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);animation:borderSpin 3s linear infinite;z-index:-1;}
 .btn-scan.pulse-glow::after{content:'';position:absolute;inset:1px;border-radius:calc(var(--r) - 1px);background:var(--surface);z-index:-1;}
 
+/* devices drawer and header button styles */
+.drawer-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0);
+  transition: background 0.3s;
+  pointer-events: none;
+  z-index: 200;
+}
+.drawer-overlay.open {
+  background: rgba(0,0,0,0.55);
+  pointer-events: all;
+  backdrop-filter: blur(4px);
+}
+
+.devices-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 320px; max-width: 90vw;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  z-index: 201;
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.48s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: -24px 0 60px rgba(0,0,0,0.5);
+}
+.devices-drawer.open { transform: translateX(0); }
+
+.drawer-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drawer-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.drawer-sub {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--sub); letter-spacing: 1px; margin-top: 4px;
+}
+.drawer-close {
+  background: none; border: none; color: var(--sub);
+  cursor: pointer; padding: 4px; transition: color 0.3s;
+  margin-top: 2px;
+}
+.drawer-close:hover { color: var(--text); }
+
+#devices-grid {
+  flex: 1; overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  align-items: stretch;
+  min-height: 0;
+}
+.drawer-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.btn-scan-drawer {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.3s;
+}
+.btn-scan-drawer:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+
+/* devices button in header */
+.btn-devices {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all .3s;
+  position: relative;
+}
+.btn-devices:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
+.btn-devices.pulse-glow { border-color: transparent; background: var(--surface); }
+.btn-devices.pulse-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--r) + 1px);
+  background: conic-gradient(from var(--glow-angle),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);
+  animation: borderSpin 3s linear infinite;
+  z-index: -1;
+}
+.btn-devices.pulse-glow::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--r) - 1px);
+  background: var(--surface);
+  z-index: -1;
+}
+.devices-count {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: rgba(123,92,250,0.2); color: var(--accent2); margin-left: 4px;
+}
 /* ── MOBILE MENU ── */
 .mobile-menu{position:fixed;top:0;left:0;right:0;background:rgba(10,10,15,0.97);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:500;transform:translateY(-110%);transition:transform .42s cubic-bezier(.4,0,.2,1);pointer-events:none;}
 .mobile-menu.open{transform:translateY(0);pointer-events:all;}
