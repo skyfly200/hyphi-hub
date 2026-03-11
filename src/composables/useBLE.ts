@@ -150,7 +150,12 @@ async function tryService(
 
 // ── connectDevice ─────────────────────────────────────────────────────────
 
-export async function connectDevice(onLog?: LogFn): Promise<ConnectResult | null> {
+/**
+ * Step 1: Open the browser BLE device picker.
+ * MUST be called directly from a click handler with no prior awaits —
+ * Chrome requires requestDevice() to run in the same microtask as the user gesture.
+ */
+export async function requestBLEDevice(onLog?: LogFn): Promise<BluetoothDevice | null> {
   const log: LogFn = onLog ?? (() => { /* noop */ })
 
   if (!bleSupported || !navigator.bluetooth) {
@@ -158,14 +163,9 @@ export async function connectDevice(onLog?: LogFn): Promise<ConnectResult | null
     throw new Error('Web Bluetooth not supported')
   }
 
-  // 1. Browser scan picker
-  // acceptAllDevices + optionalServices is the most reliable approach:
-  // filters with mixed services/namePrefix combos are rejected by Chrome in strict mode.
-  // The GATT discovery step after connect handles device validation.
   log('Opening browser BLE scan picker…', 'info')
-  let bleDevice: BluetoothDevice
   try {
-    bleDevice = await navigator.bluetooth.requestDevice({
+    return await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: [
         LED_SERVICE_UUID,
@@ -182,6 +182,21 @@ export async function connectDevice(onLog?: LogFn): Promise<ConnectResult | null
     log(`Scan failed: ${e.message}`, 'err')
     throw e
   }
+}
+
+/**
+ * Step 2: Connect GATT + discover services on an already-chosen BluetoothDevice.
+ * Call this after requestBLEDevice() resolves.
+ */
+export async function connectDevice(onLog?: LogFn): Promise<ConnectResult | null> {
+  const log: LogFn = onLog ?? (() => { /* noop */ })
+  const bleDevice = await requestBLEDevice(log)
+  if (!bleDevice) return null
+  return connectGATT(bleDevice, log)
+}
+
+export async function connectGATT(bleDevice: BluetoothDevice, onLog?: LogFn): Promise<ConnectResult | null> {
+  const log: LogFn = onLog ?? (() => { /* noop */ })
 
   log(`Found: ${bleDevice.name ?? bleDevice.id}`, 'ok')
 

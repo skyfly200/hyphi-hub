@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDeviceStore } from '@/stores/deviceStore'
-import { bleSupported, connectDevice, readNFCAndConnect } from '@/composables/useBLE'
+import { bleSupported, requestBLEDevice, connectGATT, readNFCAndConnect } from '@/composables/useBLE'
 import { MOCK_DEVICES } from '@/composables/useMock'
 
 const props = defineProps({ modelValue: Boolean })
@@ -141,16 +141,18 @@ async function startBLEScan() {
   connecting.value = true
   bleStatusText.value = 'Opening device picker…'
   try {
-    // Call connectDevice directly here — NOT through the store — so
-    // requestDevice fires in the same microtask as the click event.
-    // Going via store.connectBLE() adds an extra async hop that causes
-    // Chrome to lose the user-gesture context and block Bluetooth permission.
-    const result = await connectDevice((msg, type) => store.log(msg, type))
+    // requestBLEDevice() calls requestDevice() — must be first await with no
+    // prior async calls, so Chrome still has the user gesture context.
+    const bleDevice = await requestBLEDevice((msg, type) => store.log(msg, type))
+    if (!bleDevice) {
+      bleStatusText.value = 'Scan cancelled'
+      return
+    }
+    bleStatusText.value = `Found ${bleDevice.name ?? bleDevice.id} — connecting…`
+    const result = await connectGATT(bleDevice, (msg, type) => store.log(msg, type))
     if (result) {
       store._addDevicePublic(result)
       emit('update:modelValue', false)
-    } else {
-      bleStatusText.value = 'Scan cancelled'
     }
   } catch (e: unknown) {
     bleStatusText.value = `Error: ${(e as Error).message}`
