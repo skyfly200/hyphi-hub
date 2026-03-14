@@ -26,7 +26,7 @@ export const MOCK_DEVICES: MockDeviceDef[] = [
     id: 'mock-desk-strip',
     name: 'Desk Strip',
     type: 'LED Strip',
-    hasBattery: false,
+    hasBattery: true,
     hasAudio: true,
     ledCount: 144,
     ledType: 'WS2812B',

@@ -180,6 +180,17 @@
           <div>
             <div class="panel-title">{{ activeDev.info.name.toUpperCase() }}</div>
             <div class="panel-subtitle">{{ activeDev.info.type }} · {{ activeDev.info.ledCount }} LEDs · {{ activeDev.info.voltage }}V</div>
+            <div class="panel-battery" v-if="ds.battery !== null && ds.battery !== undefined">
+              <div class="battery-wrap">
+                <div class="battery-icon">
+                  <div class="batt-body">
+                    <div class="batt-tip"></div>
+                    <div class="batt-fill" :style="{ width: (ds.battery ?? 0) + '%' }"></div>
+                  </div>
+                </div>
+                <span>{{ ds.battery ?? 0 }}%</span>
+              </div>
+            </div>
           </div>
           <div class="power-toggle" :class="{ on: ds.power }" @click="store.togglePower(activeDev.info.id)"></div>
         </div>
@@ -264,9 +275,9 @@
               <div class="adv-row">
                 <span class="adv-row-label">Interval</span>
                 <div class="stepper">
-                  <button @click="store.setCycleTime(activeDev.info.id, Math.max(5,(ds.cycleTime??15)-5))">−</button>
+                  <button @click="store.setCycleTime(activeDev.info.id, Math.max(0.5,(ds.cycleTime??15)-0.5))">−</button>
                   <span>{{ ds.cycleTime ?? 15 }}s</span>
-                  <button @click="store.setCycleTime(activeDev.info.id, Math.min(300,(ds.cycleTime??15)+5))">+</button>
+                  <button @click="store.setCycleTime(activeDev.info.id, Math.min(300,(ds.cycleTime??15)+0.5))">+</button>
                 </div>
               </div>
               <div class="cycle-bar-wrap"><div class="cycle-bar" :style="{ width: cycleProgress + '%' }"></div></div>
@@ -489,7 +500,10 @@ function hexToRgb(hex:string):RGB {
 
 function buildLedColors(count:number, d:Partial<DeviceState>, tick:number): RGB[] {
   const base=hexToRgb(d.color??'#ff6b35'), base2=hexToRgb(d.color2??'#7b5cfa')
-  const bPct=(d.brightness??204)/255, sPct=(d.speed??5000)/65535
+  const rawB = d.brightness ?? 204
+  const bMax = rawB > 100 ? 255 : 100
+  const bPct = Math.pow(Math.min(1, Math.max(0, rawB / bMax)), 0.55)
+  const sPct = (d.speed??5000)/65535
   const t=tick/60*(0.167+sPct*4), mode=d.mode??0
   const dim=(c:RGB,f:number):RGB=>({r:Math.round(c.r*f),g:Math.round(c.g*f),b:Math.round(c.b*f)})
   const lerp=(a:RGB,b2:RGB,f:number):RGB=>({r:Math.round(a.r+(b2.r-a.r)*f),g:Math.round(a.g+(b2.g-a.g)*f),b:Math.round(a.b+(b2.b-a.b)*f)})
@@ -755,8 +769,10 @@ header.mobile{padding:12px 16px;}
 .btn-scan:hover{border-color:var(--accent);color:var(--accent);background:var(--glow);}
 .btn-scan svg{width:14px;height:14px;flex-shrink:0;}
 .btn-scan.pulse-glow{border-color:transparent;background:var(--surface);}
-.btn-scan.pulse-glow::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--r) + 1px);background:conic-gradient(from var(--glow-angle),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);animation:borderSpin 3s linear infinite;z-index:-1;}
+.btn-scan.pulse-glow::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--r) + 1px);background:conic-gradient(from var(--glow-angle),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);animation:borderSpin 3s linear infinite, glowRotate 4s linear infinite;transform-origin:center;z-index:-1;}
 .btn-scan.pulse-glow::after{content:'';position:absolute;inset:1px;border-radius:calc(var(--r) - 1px);background:var(--surface);z-index:-1;}
+
+@keyframes glowRotate{to{transform:rotate(360deg);}}
 
 /* devices drawer and header button styles */
 .drawer-overlay {
