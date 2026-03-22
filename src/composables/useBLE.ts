@@ -89,7 +89,11 @@ export class DeviceHandle implements IDeviceHandle {
     }
     try {
       console.log(`[BLE] write "${key}" →`, Array.from(bytes))
-      await char.writeValueWithoutResponse(bytes)
+      if (char.properties.writeWithoutResponse) {
+        await char.writeValueWithoutResponse(bytes)
+      } else {
+        await char.writeValue(bytes)
+      }
       console.log(`[BLE] write "${key}" ✓`)
     } catch (err) {
       console.error(`[BLE] write "${key}" failed:`, err)
@@ -173,8 +177,6 @@ export async function requestBLEDevice(onLog?: LogFn): Promise<BluetoothDevice |
         { namePrefix: 'Smart Sprout' },
         { namePrefix: 'Gloflora' },
         { namePrefix: 'BLEAM' },
-        { services: [LED_SERVICE_UUID] },
-        { services: [METADATA_SERVICE_UUID] },
       ],
       optionalServices: [
         LED_SERVICE_UUID,
@@ -232,8 +234,23 @@ export async function connectGATT(bleDevice: BluetoothDevice, onLog?: LogFn): Pr
     tryService(server, ENV_SENSE_SERVICE_UUID),
   ])
 
+  console.log('[BLE] services found:', { ledSvc: !!ledSvc, metaSvc: !!metaSvc, battSvc: !!battSvc })
+
   if (!ledSvc) {
-    log('LED service not found — is this a Hyphi device?', 'err')
+    // Try each service UUID individually to see what the device actually has
+    const probeUUIDs = [
+      LED_SERVICE_UUID, METADATA_SERVICE_UUID, BATTERY_SERVICE_UUID,
+      DEVICE_INFO_SERVICE_UUID, CURRENT_TIME_SERVICE_UUID, ENV_SENSE_SERVICE_UUID,
+      '0000ff00-0000-1000-8000-00805f9b34fb',
+      '0000fff0-0000-1000-8000-00805f9b34fb',
+      '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+    ]
+    const found: string[] = []
+    for (const uuid of probeUUIDs) {
+      try { await server.getPrimaryService(uuid); found.push(uuid) } catch {}
+    }
+    console.log('[BLE] services that responded:', found)
+    log(`LED service not found. Responding services: ${found.length ? found.join(', ') : 'none'}`, 'err')
     bleDevice.gatt?.disconnect()
     throw new Error('LED service missing')
   }
@@ -265,7 +282,10 @@ export async function connectGATT(bleDevice: BluetoothDevice, onLog?: LogFn): Pr
   const ledResults = await Promise.all(ledCharUUIDs.map(([, uuid]) => tryChar(ledSvc, uuid)))
   ledCharUUIDs.forEach(([key], i) => {
     const c = ledResults[i]
-    if (c) chars[key] = c
+    if (c) {
+      chars[key] = c
+      console.log(`[BLE] char "${key}" props:`, JSON.stringify(c.properties))
+    }
   })
   log(`LED chars resolved: ${Object.keys(chars).join(', ')}`, 'ok')
 
