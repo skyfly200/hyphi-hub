@@ -191,7 +191,9 @@ export async function requestBLEDevice(onLog?: LogFn): Promise<BluetoothDevice |
   log('Opening browser BLE scan picker…', 'info')
   try {
     return await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
+      filters: [
+        { services: [LED_SERVICE_UUID] },
+      ],
       optionalServices: [
         LED_SERVICE_UUID,
         METADATA_SERVICE_UUID,
