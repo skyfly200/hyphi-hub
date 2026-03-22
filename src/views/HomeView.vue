@@ -271,23 +271,59 @@
               <div class="toggle-small" :class="{ on: ds.audioReactive }"
                    @click="store.setAudioReactive(activeDev.info.id, !ds.audioReactive)"></div>
             </div>
-            <div v-if="ds.audioReactive" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+            <div v-if="ds.audioReactive" style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+
+              <!-- Auto threshold toggle -->
               <div class="adv-row">
-                <span class="adv-row-label">Sensitivity</span>
-                <input type="range" class="speed-slider" min="0" max="255"
-                       :value="audioSensitivity"
-                       @input="onAudioSensChange(+($event.target as HTMLInputElement).value)"
-                       style="flex:1;">
-                <span class="adv-row-value">{{ Math.round(audioSensitivity / 255 * 100) }}%</span>
-              </div>
-              <div class="adv-row">
-                <span class="adv-row-label">Mode</span>
+                <span class="adv-row-label">Threshold</span>
                 <div class="audio-mode-group">
-                  <button v-for="(m, i) in ['PULSE','SPECTRUM','BEAT']" :key="i"
-                          class="audio-mode-btn" :class="{ active: audioMode === i }"
-                          @click="audioMode = i">{{ m }}</button>
+                  <button class="audio-mode-btn" :class="{ active: ds.autoThreshold }"
+                          @click="store.setAutoThreshold(activeDev.info.id, true)">AUTO</button>
+                  <button class="audio-mode-btn" :class="{ active: !ds.autoThreshold }"
+                          @click="store.setAutoThreshold(activeDev.info.id, false)">MANUAL</button>
                 </div>
               </div>
+
+              <!-- Auto threshold controls -->
+              <template v-if="ds.autoThreshold">
+                <div class="adv-row">
+                  <span class="adv-row-label">Relative</span>
+                  <input type="range" class="speed-slider" min="0.1" max="5.0" step="0.1"
+                         :value="ds.relThreshold ?? 1.5"
+                         @input="store.setRelThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
+                         style="flex:1;">
+                  <span class="adv-row-value">{{ (ds.relThreshold ?? 1.5).toFixed(1) }}×</span>
+                </div>
+                <div class="adv-row">
+                  <span class="adv-row-label">Offset</span>
+                  <input type="range" class="speed-slider" min="0.0" max="2.0" step="0.05"
+                         :value="ds.offThreshold ?? 0.5"
+                         @input="store.setOffThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
+                         style="flex:1;">
+                  <span class="adv-row-value">{{ (ds.offThreshold ?? 0.5).toFixed(2) }}</span>
+                </div>
+              </template>
+
+              <!-- Manual (fixed) threshold -->
+              <div v-else class="adv-row">
+                <span class="adv-row-label">Fixed</span>
+                <input type="range" class="speed-slider" min="0" max="1024" step="1"
+                       :value="ds.staticThreshold ?? 512"
+                       @input="store.setStaticThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
+                       style="flex:1;">
+                <span class="adv-row-value">{{ ds.staticThreshold ?? 512 }}</span>
+              </div>
+
+              <!-- Damping -->
+              <div class="adv-row">
+                <span class="adv-row-label">Damping</span>
+                <input type="range" class="speed-slider" min="0" max="255"
+                       :value="ds.damping ?? 5"
+                       @input="store.setDamping(activeDev.info.id, +($event.target as HTMLInputElement).value)"
+                       style="flex:1;">
+                <span class="adv-row-value">{{ ds.damping ?? 5 }}</span>
+              </div>
+
             </div>
           </div>
 
@@ -507,15 +543,6 @@ function fxDrop(i: number) {
   if (src === null || src === i) return
   const moved = fxSlots.value.splice(src, 1)[0]
   fxSlots.value.splice(i, 0, moved)
-}
-
-// ── Audio reactive state ───────────────────────────────────────────────────
-const audioSensitivity = ref(128)
-const audioMode        = ref(0)
-
-function onAudioSensChange(val: number) {
-  audioSensitivity.value = val
-  // TODO: wire to store.setAudioSensitivity when firmware supports it
 }
 
 // ── Scenes ─────────────────────────────────────────────────────────────────

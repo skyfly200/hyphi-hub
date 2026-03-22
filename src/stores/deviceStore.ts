@@ -313,6 +313,34 @@ export const useDeviceStore = defineStore('devices', () => {
     await dev.handle.setAudioReactive(on)
   }
 
+  async function setAutoThreshold(id: string, on: boolean): Promise<void> {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.autoThreshold = on
+    await dev.handle.setAutoThreshold(on)
+  }
+
+  function setRelThreshold(id: string, val: number): void {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.relThreshold = val
+    _debouncedWrite<number>(id, 'setRelThreshold')(val)
+  }
+
+  function setOffThreshold(id: string, val: number): void {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.offThreshold = val
+    _debouncedWrite<number>(id, 'setOffThreshold')(val)
+  }
+
+  function setStaticThreshold(id: string, val: number): void {
+    const dev = _device(id)
+    if (!dev) return
+    dev.state.staticThreshold = val
+    _debouncedWrite<number>(id, 'setStaticThreshold')(val)
+  }
+
   function setDamping(id: string, val: number): void {
     const dev = _device(id)
     if (!dev) return
@@ -349,6 +377,10 @@ export const useDeviceStore = defineStore('devices', () => {
     setAutoCycle,
     setCycleTime,
     setAudioReactive,
+    setAutoThreshold,
+    setRelThreshold,
+    setOffThreshold,
+    setStaticThreshold,
     setDamping,
     _addDevicePublic: _addDevice,
   }
