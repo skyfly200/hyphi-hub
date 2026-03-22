@@ -87,34 +87,11 @@ export class DeviceHandle implements IDeviceHandle {
       console.warn(`[BLE] char "${key}" not found — available:`, Object.keys(this.chars).filter(k => !!(this.chars as any)[k]))
       return
     }
-
-    const writeWithoutResponse = !!char.properties.writeWithoutResponse
-    const writeWithResponse    = !!char.properties.write
-
     try {
       console.log(`[BLE] write "${key}" →`, Array.from(bytes))
-
-      if (writeWithoutResponse) {
-        await char.writeValueWithoutResponse(bytes)
-      } else if (writeWithResponse) {
-        await char.writeValue(bytes)
-      } else {
-        throw new Error('Characteristic does not support write or writeWithoutResponse')
-      }
-
+      await char.writeValueWithoutResponse(bytes)
       console.log(`[BLE] write "${key}" ✓`)
     } catch (err) {
-      // Try writeValue if writeValueWithoutResponse is not supported or fails
-      if (writeWithoutResponse && writeWithResponse) {
-        try {
-          console.log(`[BLE] write "${key}" retrying with writeValue`)
-          await char.writeValue(bytes)
-          console.log(`[BLE] write "${key}" ✓ (writeValue)`)
-          return
-        } catch {
-          // fall through to error throw below
-        }
-      }
       console.error(`[BLE] write "${key}" failed:`, err)
       throw err
     }
@@ -192,7 +169,12 @@ export async function requestBLEDevice(onLog?: LogFn): Promise<BluetoothDevice |
   try {
     return await navigator.bluetooth.requestDevice({
       filters: [
+        { namePrefix: 'Hyphi' },
+        { namePrefix: 'Smart Sprout' },
+        { namePrefix: 'Gloflora' },
+        { namePrefix: 'BLEAM' },
         { services: [LED_SERVICE_UUID] },
+        { services: [METADATA_SERVICE_UUID] },
       ],
       optionalServices: [
         LED_SERVICE_UUID,

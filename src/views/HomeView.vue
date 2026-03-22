@@ -63,11 +63,9 @@
           <span class="status-dot" :class="{ connected: store.connectedCount > 0 }"></span>
           <span class="status-text">{{ store.connectedCount > 0 ? (activeDev?.info.name.toUpperCase() ?? 'CONNECTED') : 'NO DEVICE' }}</span>
         </div>
-        <!-- devices drawer trigger -->
-        <button class="btn-devices" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="drawerOpen = true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
-          <span class="btn-label">DEVICES</span>
-          <span class="devices-count" v-if="store.devices.length > 0">{{ store.devices.length }}</span>
+        <button class="btn-scan" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="openScan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
+          SCAN
         </button>
       </div>
       <button class="hamburger" @click="mobileMenuOpen = !mobileMenuOpen">
@@ -94,49 +92,36 @@
       </div>
     </div>
 
-    <!-- devices drawer and overlay -->
-    <div class="drawer-overlay" :class="{ open: drawerOpen }" @click="drawerOpen = false"></div>
-    <div class="devices-drawer" :class="{ open: drawerOpen }">
-      <div class="drawer-header">
-        <div>
-          <div class="drawer-title">DEVICES</div>
-          <div class="drawer-sub" v-if="store.devices.length === 0">No devices connected</div>
-        </div>
-        <button class="drawer-close" @click="drawerOpen = false">✕</button>
-      </div>
-      <div id="devices-grid">
-        <template v-if="store.devices.length > 0">
-          <template v-for="dev in store.devices" :key="dev.info.id">
-            <div class="device-card" :class="{ active: dev.info.id === store.activeId }" @click="store.setActive(dev.info.id)">
-              <div class="device-name">
-                {{ dev.info.name }}
-                <span class="device-badge">{{ dev.info.type }}</span>
-                <div class="device-color-preview" :style="{ background: dev.state?.color ?? '#ff6b35' }"></div>
-              </div>
-              <div class="device-id">{{ dev.info.id.slice(0, 22) }}</div>
-              <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <span class="status-dot" :class="{ connected: dev.state?.connected }"></span>
-                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">{{ dev.state?.connected ? 'CONNECTED' : 'DISCONNECTED' }}</span>
-                <button v-if="!dev.state?.connected" class="btn-reconnect" @click.stop="store.reconnect(dev.info.id)">RECONNECT</button>
-                <button class="btn-remove" @click.stop="store.removeDevice(dev.info.id)">✕</button>
-              </div>
-            </div>
-          </template>
-        </template>
-        <div v-else class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
-          <p>SCAN TO DISCOVER DEVICES</p>
-        </div>
-      </div>
-      <div class="drawer-footer">
-        <button class="btn-scan-drawer" :class="{ 'pulse-glow': store.connectedCount === 0 }" @click="openScan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
-          ADD DEVICE
-        </button>
-      </div>
-    </div>
-
     <main>
+      <!-- ── Devices grid ── -->
+      <div class="section-label">DEVICES</div>
+      <div class="devices-grid">
+        <template v-for="dev in store.devices" :key="dev.info.id">
+          <div class="device-card" :class="{ active: dev.info.id === store.activeId }" @click="store.setActive(dev.info.id)">
+            <div class="device-name">
+              {{ dev.info.name }}
+              <span class="device-badge">{{ dev.info.type }}</span>
+              <div class="device-color-preview" :style="{ background: dev.state?.color ?? '#ff6b35' }"></div>
+            </div>
+            <div class="device-id">{{ dev.info.id.slice(0, 22) }}</div>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span class="status-dot" :class="{ connected: dev.state?.connected }"></span>
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">{{ dev.state?.connected ? 'CONNECTED' : 'DISCONNECTED' }}</span>
+              <button v-if="!dev.state?.connected" class="btn-reconnect" @click.stop="store.reconnect(dev.info.id)">RECONNECT</button>
+              <button class="btn-remove" @click.stop="store.removeDevice(dev.info.id)">✕</button>
+            </div>
+          </div>
+        </template>
+        <div v-if="store.devices.length === 0" class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg>
+          <p>NO DEVICES CONNECTED</p>
+          <button class="btn-scan pulse-glow" style="margin-top:8px;" @click="openScan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M8 2H2v6M16 2h6v6M8 22H2v-6M16 22h6v-6M12 7a5 5 0 100 10 5 5 0 000-10z"/></svg>
+            SCAN FOR DEVICES
+          </button>
+        </div>
+      </div>
+
       <!-- ── Control panel ── -->
       <div v-if="activeDev" class="control-panel-wrap">
 
@@ -180,17 +165,6 @@
           <div>
             <div class="panel-title">{{ activeDev.info.name.toUpperCase() }}</div>
             <div class="panel-subtitle">{{ activeDev.info.type }} · {{ activeDev.info.ledCount }} LEDs · {{ activeDev.info.voltage }}V</div>
-            <div class="panel-battery" v-if="ds.battery !== null && ds.battery !== undefined">
-              <div class="battery-wrap">
-                <div class="battery-icon">
-                  <div class="batt-body">
-                    <div class="batt-tip"></div>
-                    <div class="batt-fill" :style="{ width: (ds.battery ?? 0) + '%' }"></div>
-                  </div>
-                </div>
-                <span>{{ ds.battery ?? 0 }}%</span>
-              </div>
-            </div>
           </div>
           <div class="power-toggle" :class="{ on: ds.power }" @click="store.togglePower(activeDev.info.id)"></div>
         </div>
@@ -253,7 +227,13 @@
 
           <!-- Effects -->
           <div class="control-block full">
-            <div class="control-label">EFFECTS</div>
+            <div class="control-label">
+              EFFECT MODE
+              <button class="btn-edit-effects" @click="fxDrawerOpen = true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                EDIT
+              </button>
+            </div>
             <div class="effect-grid">
               <button v-for="fx in fxSlots" :key="fx.mode"
                       class="effect-btn" :class="{ active: ds.mode === fx.mode }"
@@ -273,23 +253,41 @@
             </div>
             <div v-if="ds.autoCycle" style="margin-top:10px;">
               <div class="adv-row">
-                <span class="adv-row-label">Interval</span>
+                <span class="adv-row-label">Cycle every</span>
                 <div class="stepper">
-                  <button @click="store.setCycleTime(activeDev.info.id, Math.max(0.5,(ds.cycleTime??15)-0.5))">−</button>
+                  <button @click="store.setCycleTime(activeDev.info.id, Math.max(5,(ds.cycleTime??15)-5))">−</button>
                   <span>{{ ds.cycleTime ?? 15 }}s</span>
-                  <button @click="store.setCycleTime(activeDev.info.id, Math.min(300,(ds.cycleTime??15)+0.5))">+</button>
+                  <button @click="store.setCycleTime(activeDev.info.id, Math.min(300,(ds.cycleTime??15)+5))">+</button>
                 </div>
               </div>
               <div class="cycle-bar-wrap"><div class="cycle-bar" :style="{ width: cycleProgress + '%' }"></div></div>
             </div>
           </div>
 
-          <!-- Audio reactive -->
+          <!-- Audio Responsive -->
           <div class="control-block full adv-block" v-if="activeDev.info.hasAudio">
             <div class="control-label">
-              AUDIO REACTIVE
+              AUDIO RESPONSIVE
               <div class="toggle-small" :class="{ on: ds.audioReactive }"
                    @click="store.setAudioReactive(activeDev.info.id, !ds.audioReactive)"></div>
+            </div>
+            <div v-if="ds.audioReactive" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+              <div class="adv-row">
+                <span class="adv-row-label">Sensitivity</span>
+                <input type="range" class="speed-slider" min="0" max="255"
+                       :value="audioSensitivity"
+                       @input="onAudioSensChange(+($event.target as HTMLInputElement).value)"
+                       style="flex:1;">
+                <span class="adv-row-value">{{ Math.round(audioSensitivity / 255 * 100) }}%</span>
+              </div>
+              <div class="adv-row">
+                <span class="adv-row-label">Mode</span>
+                <div class="audio-mode-group">
+                  <button v-for="(m, i) in ['PULSE','SPECTRUM','BEAT']" :key="i"
+                          class="audio-mode-btn" :class="{ active: audioMode === i }"
+                          @click="audioMode = i">{{ m }}</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -314,7 +312,7 @@
       </div><!-- /control-panel-wrap -->
 
       <!-- No device -->
-      <div v-else class="no-device-state">
+      <div v-else-if="store.devices.length > 0" class="no-device-state">
         <div class="no-device-inner">
           <div class="no-device-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2L8 6l4 4-4 4 4 4M12 2l4 4-4 4 4 4-4 4"/></svg></div>
           <div class="no-device-msg">No device selected</div>
@@ -328,8 +326,73 @@
 
     </main>
 
-    <ScanModal v-model="scanOpen" @connected="scanOpen = false" />
+    <ScanModal v-model="scanOpen" />
     <div class="toast" :class="{ show: toastVisible }">{{ toastMsg }}</div>
+
+    <!-- ── FX Drawer ── -->
+    <div class="fx-drawer-overlay" :class="{ open: fxDrawerOpen }" @click="fxDrawerOpen = false"></div>
+    <div class="fx-drawer" :class="{ open: fxDrawerOpen }">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-title">EFFECTS</div>
+          <div class="drawer-sub">Customize your effect buttons</div>
+        </div>
+        <button class="drawer-close" @click="fxDrawerOpen = false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Current slots (draggable) -->
+      <div class="fx-list">
+        <div v-if="fxSlots.length === 0" class="fx-empty">No effects added yet</div>
+        <div v-for="(fx, i) in fxSlots" :key="fx.mode"
+             class="fx-item"
+             draggable="true"
+             :class="{ dragging: fxDragSrc === i, 'drag-over': fxDragOver === i }"
+             @dragstart="fxDragSrc = i"
+             @dragover.prevent="fxDragOver = i"
+             @dragleave="fxDragOver = null"
+             @drop="fxDrop(i)"
+             @dragend="fxDragSrc = null; fxDragOver = null">
+          <div class="fx-drag-handle">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/>
+              <circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/>
+              <circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="fx-item-icon">{{ fx.icon }}</div>
+          <div class="fx-item-name">{{ fx.name }}</div>
+          <div class="fx-item-mode">#{{ fx.mode.toString().padStart(2,'0') }}</div>
+          <button class="btn-fx-delete" @click="fxSlots.splice(i, 1)">✕</button>
+        </div>
+      </div>
+
+      <!-- Add new effect -->
+      <div class="fx-add-panel">
+        <div class="fx-add-label">ADD EFFECT</div>
+        <div class="fx-add-row">
+          <select v-model="fxSelectMode" class="fx-select">
+            <option value="" disabled>Choose effect…</option>
+            <option v-for="e in WS2812FX_EFFECTS" :key="e.mode" :value="e.mode">#{{ e.mode.toString().padStart(2,'0') }} {{ e.name }}</option>
+          </select>
+          <button class="btn-fx-add" @click="addFxSlot">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            ADD
+          </button>
+        </div>
+        <div class="fx-add-label" style="margin-top:10px;">ICON</div>
+        <input v-model="fxIconSearch" class="fx-select" placeholder="Search icons…" style="margin-bottom:8px;">
+        <div class="fx-icon-grid">
+          <button v-for="ic in filteredIcons" :key="ic"
+                  class="fx-icon-btn" :class="{ selected: fxSelectedIcon === ic }"
+                  @click="fxSelectedIcon = ic">{{ ic }}</button>
+        </div>
+        <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);">
+          Selected: <span style="font-size:18px;vertical-align:middle;">{{ fxSelectedIcon }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -342,7 +405,6 @@ import type { DeviceState } from '@/ble-protocol'
 const store = useDeviceStore()
 const isMobile        = ref(window.innerWidth < 520)
 const scanOpen        = ref(false)
-const drawerOpen      = ref(false)
 const mobileMenuOpen  = ref(false)
 const logOpen         = ref(false)
 const toastVisible    = ref(false)
@@ -352,12 +414,6 @@ window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 5
 
 function openScan() { scanOpen.value = true }
 function toast(msg: string) { toastMsg.value = msg; toastVisible.value = true; setTimeout(() => { toastVisible.value = false }, 2800) }
-
-// when the scan modal is shown hide the drawer so it isn't layered
-watch(scanOpen, open => { if (open) drawerOpen.value = false })
-
-// close drawer automatically when first device appears
-watch(() => store.connectedCount, cnt => { if (cnt > 0) drawerOpen.value = false })
 
 // ── Active device ──────────────────────────────────────────────────────────
 const activeDev = computed(() => store.activeDevice)
@@ -383,7 +439,7 @@ function onColorInput(hex: string) {
 }
 
 // ── Effects ────────────────────────────────────────────────────────────────
-const fxSlots = [
+const fxSlots = ref([
   { mode:0,  name:'Static',    icon:'◼' },
   { mode:2,  name:'Breath',    icon:'〰' },
   { mode:11, name:'Rainbow',   icon:'🌈' },
@@ -393,7 +449,74 @@ const fxSlots = [
   { mode:23, name:'Sparkle',   icon:'✦' },
   { mode:43, name:'Larson',    icon:'🔴' },
   { mode:49, name:'Fire',      icon:'🔥' },
+])
+
+// FX Drawer state
+const fxDrawerOpen   = ref(false)
+const fxSelectMode   = ref<number|''>('')
+const fxSelectedIcon = ref('✦')
+const fxIconSearch   = ref('')
+const fxDragSrc      = ref<number|null>(null)
+const fxDragOver     = ref<number|null>(null)
+
+const WS2812FX_EFFECTS = [
+  {mode:0,name:'Static'},{mode:1,name:'Blink'},{mode:2,name:'Breath'},{mode:3,name:'Color Wipe'},
+  {mode:4,name:'Color Wipe Inv'},{mode:5,name:'Color Wipe Rev'},{mode:7,name:'Color Wipe Random'},
+  {mode:8,name:'Random Color'},{mode:9,name:'Single Dynamic'},{mode:10,name:'Multi Dynamic'},
+  {mode:11,name:'Rainbow'},{mode:12,name:'Rainbow Cycle'},{mode:13,name:'Scan'},{mode:14,name:'Dual Scan'},
+  {mode:15,name:'Fade'},{mode:16,name:'Theater Chase'},{mode:17,name:'Theater Chase Rainbow'},
+  {mode:18,name:'Running Lights'},{mode:19,name:'Twinkle'},{mode:20,name:'Twinkle Random'},
+  {mode:21,name:'Twinkle Fade'},{mode:22,name:'Twinkle Fade Random'},{mode:23,name:'Sparkle'},
+  {mode:24,name:'Flash Sparkle'},{mode:25,name:'Hyper Sparkle'},{mode:26,name:'Strobe'},
+  {mode:27,name:'Strobe Rainbow'},{mode:28,name:'Multi Strobe'},{mode:29,name:'Blink Rainbow'},
+  {mode:30,name:'Chase White'},{mode:31,name:'Chase Color'},{mode:32,name:'Chase Random'},
+  {mode:33,name:'Chase Rainbow'},{mode:43,name:'Larson Scanner'},{mode:44,name:'Comet'},
+  {mode:45,name:'Fireworks'},{mode:46,name:'Fireworks Random'},{mode:49,name:'Fire Flicker'},
+  {mode:50,name:'Fire Flicker Soft'},{mode:51,name:'Fire Flicker Intense'},{mode:59,name:'Twinklefox'},
+  {mode:60,name:'Rain'},{mode:63,name:'Dual Larson'},{mode:70,name:'Heartbeat'},{mode:74,name:'Popcorn'},
+  {mode:75,name:'Oscillator'},
 ]
+
+const FX_ICONS = [
+  '💡','🕯️','🔆','🌟','✨','⭐','💫','🌠','✦','✧','❋','✼','❇️','🔮',
+  '🔥','♨️','🌋','💥','⚡','🌩️','☄️','🌊','💧','❄️','🌨️','🌈','🌸','🌺','🍀','🌿','🌙','☀️',
+  '🎆','🎇','🎉','🎊','🎈','🪩','🥳','🌀','🪐','🛸','🔭','🌌','👁️',
+  '◼','◻','◆','◇','●','○','▲','△','▶️','⏩','🔄','↩️','〰','∿','≋','⟳',
+  '🦋','🐝','🐉','🦊','🔴','🟠','🟡','🟢','🔵','🟣','⚪','💜','🧡','💛','💚','💙','🩷',
+]
+
+const filteredIcons = computed(() => {
+  const q = fxIconSearch.value.toLowerCase().trim()
+  if (!q) return FX_ICONS
+  return FX_ICONS.filter(ic => ic.includes(q))
+})
+
+function addFxSlot() {
+  if (fxSelectMode.value === '') { toast('Pick an effect first'); return }
+  const mode = fxSelectMode.value as number
+  const fx = WS2812FX_EFFECTS.find(e => e.mode === mode)
+  if (!fx) return
+  if (fxSlots.value.find(s => s.mode === mode)) { toast('Effect already added'); return }
+  fxSlots.value.push({ mode, name: fx.name, icon: fxSelectedIcon.value || '✦' })
+  fxSelectMode.value = ''
+  toast(`Added: ${fx.name}`)
+}
+
+function fxDrop(i: number) {
+  const src = fxDragSrc.value
+  if (src === null || src === i) return
+  const moved = fxSlots.value.splice(src, 1)[0]
+  fxSlots.value.splice(i, 0, moved)
+}
+
+// ── Audio reactive state ───────────────────────────────────────────────────
+const audioSensitivity = ref(128)
+const audioMode        = ref(0)
+
+function onAudioSensChange(val: number) {
+  audioSensitivity.value = val
+  // TODO: wire to store.setAudioSensitivity when firmware supports it
+}
 
 // ── Scenes ─────────────────────────────────────────────────────────────────
 function applyScene(name: string) {
@@ -500,10 +623,7 @@ function hexToRgb(hex:string):RGB {
 
 function buildLedColors(count:number, d:Partial<DeviceState>, tick:number): RGB[] {
   const base=hexToRgb(d.color??'#ff6b35'), base2=hexToRgb(d.color2??'#7b5cfa')
-  const rawB = d.brightness ?? 204
-  const bMax = rawB > 100 ? 255 : 100
-  const bPct = Math.pow(Math.min(1, Math.max(0, rawB / bMax)), 0.55)
-  const sPct = (d.speed??5000)/65535
+  const bPct=(d.brightness??204)/255, sPct=(d.speed??5000)/65535
   const t=tick/60*(0.167+sPct*4), mode=d.mode??0
   const dim=(c:RGB,f:number):RGB=>({r:Math.round(c.r*f),g:Math.round(c.g*f),b:Math.round(c.b*f)})
   const lerp=(a:RGB,b2:RGB,f:number):RGB=>({r:Math.round(a.r+(b2.r-a.r)*f),g:Math.round(a.g+(b2.g-a.g)*f),b:Math.round(a.b+(b2.b-a.b)*f)})
@@ -693,52 +813,22 @@ onUnmounted(()=>{
 })
 </script>
 
-<style>
-/* global reset applies to document root so white body margin/background won't peek through */
-:root {
-  --bg:        #0a0a0f;
-  --surface:   #111118;
-  --panel:     #16161f;
-  --border:    #2a2a3a;
-  --muted:     #3a3a50;
-  --text:      #e8e8f0;
-  --sub:       #7a7a9a;
-  --accent:    #ff6b35;
-  --accent2:   #7b5cfa;
-  --glow:      rgba(255,107,53,0.18);
-  --glow2:     rgba(123,92,250,0.15);
-  --connected: #3dffc0;
-  --r: 8px;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-}
-
-body {
-  overflow-x: hidden;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20256%20256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  opacity: 0.4;
-}
-
+<style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
 
-.app-shell{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
+.app-shell{background:#0a0a0f;color:#e8e8f0;font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
+
+/* Global reset — scoped doesn't apply to body, so inject via :global */
+:global(*, *::before, *::after){box-sizing:border-box;margin:0;padding:0;}
+:global(body){background:#0a0a0f;margin:0;padding:0;border:none;overflow-x:hidden;}
+:global(html){background:#0a0a0f;}
+
+/* ── CSS custom props ── */
+.app-shell{
+  --bg:#0a0a0f;--surface:#111118;--panel:#16161f;--border:#2a2a3a;--muted:#3a3a50;
+  --text:#e8e8f0;--sub:#7a7a9a;--accent:#ff6b35;--accent2:#7b5cfa;
+  --glow:rgba(255,107,53,0.18);--glow2:rgba(123,92,250,0.15);--connected:#3dffc0;--r:8px;
+}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -770,123 +860,10 @@ header.mobile{padding:12px 16px;}
 .btn-scan{display:flex;align-items:center;gap:8px;padding:9px 20px;background:transparent;border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .3s;position:relative;}
 .btn-scan:hover{border-color:var(--accent);color:var(--accent);background:var(--glow);}
 .btn-scan svg{width:14px;height:14px;flex-shrink:0;}
-.btn-scan.pulse-glow{border-color:transparent;background:var(--surface);position:relative;box-shadow:0 0 18px rgba(255,107,53,0.28),0 0 28px rgba(123,92,250,0.18);}
-.btn-scan.pulse-glow::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--r) + 1px);background:conic-gradient(from var(--glow-angle, 0deg),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);animation:borderSpin 3s linear infinite;z-index:-1;}
+.btn-scan.pulse-glow{border-color:transparent;background:var(--surface);}
+.btn-scan.pulse-glow::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--r) + 1px);background:conic-gradient(from var(--glow-angle),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);animation:borderSpin 3s linear infinite;z-index:-1;}
 .btn-scan.pulse-glow::after{content:'';position:absolute;inset:1px;border-radius:calc(var(--r) - 1px);background:var(--surface);z-index:-1;}
 
-
-/* devices drawer and header button styles */
-.drawer-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0);
-  transition: background 0.3s;
-  pointer-events: none;
-  z-index: 200;
-}
-.drawer-overlay.open {
-  background: rgba(0,0,0,0.55);
-  pointer-events: all;
-  backdrop-filter: blur(4px);
-}
-
-.devices-drawer {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  width: 320px; max-width: 90vw;
-  background: var(--panel);
-  border-left: 1px solid var(--border);
-  z-index: 201;
-  display: flex; flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.48s cubic-bezier(0.4,0,0.2,1);
-  box-shadow: -24px 0 60px rgba(0,0,0,0.5);
-}
-.devices-drawer.open { transform: translateX(0); }
-
-.drawer-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 28px 24px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.drawer-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px; letter-spacing: 4px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.drawer-sub {
-  font-family: 'DM Mono', monospace; font-size: 10px;
-  color: var(--sub); letter-spacing: 1px; margin-top: 4px;
-}
-.drawer-close {
-  background: none; border: none; color: var(--sub);
-  cursor: pointer; padding: 4px; transition: color 0.3s;
-  margin-top: 2px;
-}
-.drawer-close:hover { color: var(--text); }
-
-#devices-grid {
-  flex: 1; overflow-y: auto;
-  padding: 16px;
-  display: flex; flex-direction: column; gap: 10px;
-  align-items: stretch;
-  min-height: 0;
-}
-.drawer-footer {
-  padding: 16px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.btn-scan-drawer {
-  width: 100%;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 11px 20px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  color: var(--text);
-  font-family: 'DM Mono', monospace;
-  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-  cursor: pointer; transition: all 0.3s;
-}
-.btn-scan-drawer:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
-
-/* devices button in header */
-.btn-devices {
-  display: flex; align-items: center; gap: 7px;
-  padding: 9px 16px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  color: var(--text);
-  font-family: 'DM Mono', monospace;
-  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
-  cursor: pointer; transition: all .3s;
-  position: relative;
-}
-.btn-devices:hover { border-color: var(--accent2); color: var(--accent2); background: var(--glow2); }
-.btn-devices.pulse-glow { border-color: transparent; background: var(--surface); box-shadow: 0 0 16px rgba(255,107,53,0.28), 0 0 24px rgba(123,92,250,0.18); }
-.btn-devices.pulse-glow::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: calc(var(--r) + 1px);
-  background: conic-gradient(from var(--glow-angle, 0deg),var(--accent2) 0%,var(--accent) 25%,transparent 40%,transparent 60%,var(--accent) 75%,var(--accent2) 100%);
-  animation: borderSpin 3s linear infinite;
-  z-index: -1;
-}
-.btn-devices.pulse-glow::after {
-  content: '';
-  position: absolute;
-  inset: 1px;
-  border-radius: calc(var(--r) - 1px);
-  background: var(--surface);
-  z-index: -1;
-}
-.devices-count {
-  font-size: 10px; padding: 2px 6px; border-radius: 4px;
-  background: rgba(123,92,250,0.2); color: var(--accent2); margin-left: 4px;
-}
 /* ── MOBILE MENU ── */
 .mobile-menu{position:fixed;top:0;left:0;right:0;background:rgba(10,10,15,0.97);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:500;transform:translateY(-110%);transition:transform .42s cubic-bezier(.4,0,.2,1);pointer-events:none;}
 .mobile-menu.open{transform:translateY(0);pointer-events:all;}
@@ -1038,9 +1015,50 @@ input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:1px;color:var(--text);opacity:0;transition:all .35s;pointer-events:none;z-index:9999;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* ── FX DRAWER ── */
+.fx-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:200;pointer-events:none;transition:background .45s;}
+.fx-drawer-overlay.open{background:rgba(0,0,0,0.55);pointer-events:all;backdrop-filter:blur(4px);}
+.fx-drawer{position:fixed;top:0;right:0;bottom:0;width:340px;max-width:92vw;background:var(--panel);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .48s cubic-bezier(.4,0,.2,1);box-shadow:-24px 0 60px rgba(0,0,0,.5);}
+.fx-drawer.open{transform:translateX(0);}
+.drawer-header{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 20px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.drawer-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.drawer-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);letter-spacing:1px;margin-top:4px;}
+.drawer-close{background:none;border:none;color:var(--sub);cursor:pointer;padding:2px;transition:color .2s;flex-shrink:0;}
+.drawer-close:hover{color:var(--text);}
+.fx-list{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;}
+.fx-empty{padding:24px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.fx-item{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:default;transition:border-color .3s;}
+.fx-item.drag-over{border-color:var(--accent2);background:rgba(123,92,250,0.07);}
+.fx-item.dragging{opacity:.35;border-style:dashed;}
+.fx-drag-handle{color:var(--muted);cursor:grab;padding:2px 4px;flex-shrink:0;display:flex;align-items:center;}
+.fx-drag-handle:active{cursor:grabbing;}
+.fx-item-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0;}
+.fx-item-name{flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fx-item-mode{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;flex-shrink:0;}
+.btn-fx-delete{background:none;border:1px solid rgba(255,55,77,0.35);color:#ff374d;width:24px;height:24px;border-radius:4px;cursor:pointer;transition:background .22s;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;}
+.btn-fx-delete:hover{background:rgba(255,55,77,0.15);}
+.fx-add-panel{border-top:1px solid var(--border);padding:16px;flex-shrink:0;}
+.fx-add-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--sub);text-transform:uppercase;margin-bottom:10px;}
+.fx-add-row{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;}
+.fx-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none;transition:border-color .3s;}
+.fx-select:focus{border-color:var(--accent2);}
+.btn-fx-add{display:flex;align-items:center;gap:6px;padding:8px 14px;background:transparent;border:1px solid var(--accent);border-radius:7px;color:var(--accent);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .3s;flex-shrink:0;}
+.btn-fx-add:hover{background:var(--glow);}
+.fx-icon-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:96px;overflow-y:auto;padding:4px 0;}
+.fx-icon-btn{width:34px;height:34px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.fx-icon-btn:hover{border-color:var(--accent2);background:rgba(123,92,250,0.1);}
+.fx-icon-btn.selected{border-color:var(--accent2);background:rgba(123,92,250,0.2);}
+.btn-edit-effects{display:flex;align-items:center;gap:5px;padding:4px 10px;background:none;border:1px solid var(--border);border-radius:5px;color:var(--sub);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .3s;}
+.btn-edit-effects:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* ── AUDIO ── */
+.adv-row-value{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent2);min-width:34px;text-align:right;}
+.audio-mode-group{display:flex;gap:6px;flex-wrap:wrap;}
+.audio-mode-btn{padding:5px 12px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--sub);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .22s;}
+.audio-mode-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+.audio-mode-btn.active{border-color:var(--accent2);color:var(--accent2);background:var(--glow2);}
+
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 </style>
-
-<!-- scoped styles moved earlier; no additional changes needed -->
