@@ -9,6 +9,8 @@ import {
   connectDevice,
   reconnectDevice as bleReconnect,
   readNFCAndConnect,
+  getKnownDevices,
+  connectGATT,
 } from '@/composables/useBLE'
 import { MockHandle, mockConnectResult, MOCK_DEVICES } from '@/composables/useMock'
 import type { MockDeviceDef } from '@/composables/useMock'
@@ -54,6 +56,84 @@ export const useDeviceStore = defineStore('devices', () => {
   const connectedCount = computed<number>(() =>
     devices.value.filter(d => d.state?.connected).length
   )
+
+  // ── Persist known device IDs ───────────────────────────────────────────
+  const STORAGE_KEY = 'hyphi-hub:known-devices'
+
+  function _saveKnownDevices() {
+    const ids = devices.value.map(d => ({ id: d.info.id, name: d.info.name }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+  }
+
+  function _loadKnownDeviceIds(): { id: string; name: string }[] {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    } catch { return [] }
+  }
+
+  /**
+   * On app load, check navigator.bluetooth.getDevices() for previously
+   * permitted devices and attempt silent GATT reconnect for each one.
+   */
+  async function restoreKnownDevices(): Promise<void> {
+    const saved = _loadKnownDeviceIds()
+    if (saved.length === 0) return
+    const known = await getKnownDevices()
+    if (known.length === 0) {
+      log(`${saved.length} known device(s) — click Reconnect to restore`, 'info')
+      // Pre-populate disconnected stubs so user sees them with reconnect buttons
+      for (const s of saved) {
+        if (!devices.value.find(d => d.info.id === s.id)) {
+          _addStub(s.id, s.name)
+        }
+      }
+      return
+    }
+    for (const bleDevice of known) {
+      if (devices.value.find(d => d.info.id === bleDevice.id)) continue
+      log(`Auto-reconnecting to ${bleDevice.name ?? bleDevice.id}…`, 'info')
+      try {
+        const result = await connectGATT(bleDevice, (msg, type) => log(msg, type))
+        if (result) _addDevice(result)
+      } catch {
+        // Silent fail — add stub so user can manually reconnect
+        _addStub(bleDevice.id, bleDevice.name ?? 'Unknown Device')
+        log(`Auto-reconnect failed for ${bleDevice.name ?? bleDevice.id} — click Reconnect`, 'info')
+      }
+    }
+  }
+
+  /** Add a disconnected placeholder entry so the user can see + reconnect */
+  function _addStub(id: string, name: string) {
+    if (devices.value.find(d => d.info.id === id)) return
+    const stubState: DeviceState = {
+      connected: false, power: false, mode: 0, brightness: 204,
+      color: '#ff6b35', color2: '#7b5cfa', color3: '#3dffc0',
+      speed: 5000, autoCycle: false, cycleTime: 15, battery: null,
+      audioReactive: false, autoThreshold: true, relThreshold: 1.5,
+      offThreshold: 0.5, staticThreshold: 512, damping: 5,
+      current: 0, temp: null, gamma: 2.2,
+      manufacturer: name, model: 'Unknown', firmware: 'Unknown',
+    }
+    // Minimal stub handle — reconnect will replace it
+    const stubHandle: IDeviceHandle = {
+      state: stubState,
+      get bleDevice() { return undefined as any },
+      disconnect() {},
+      setPower: async () => {}, setMode: async () => {}, setBrightness: async () => {},
+      setColor: async () => {}, setSpeed: async () => {}, setAutoCycle: async () => {},
+      setCycleTime: async () => {}, setAudioReactive: async () => {}, setAutoThreshold: async () => {},
+      setRelThreshold: async () => {}, setOffThreshold: async () => {}, setStaticThreshold: async () => {},
+      setDamping: async () => {}, syncTime: async () => {},
+    }
+    devices.value.push({
+      info: { id, name, type: 'LED Device', hasBattery: false, hasAudio: false, ledCount: 60, ledType: 'WS2812B', voltage: 5, battCapMah: null, themeColor: '#ff6b35', modelUri: null },
+      state: stubState,
+      handle: stubHandle,
+      logs: [],
+      _pollInterval: null,
+    })
+  }
 
   // ── Logging ──────────────────────────────────────────────────────────────
   const globalLogs = ref<LogEntry[]>([
@@ -183,6 +263,7 @@ export const useDeviceStore = defineStore('devices', () => {
     devices.value.push(entry)
     activeId.value = result.id
     log(`Connected: ${result.name}`, 'ok', result.id)
+    _saveKnownDevices()
   }
 
   // ── Disconnect ────────────────────────────────────────────────────────────
@@ -204,6 +285,7 @@ export const useDeviceStore = defineStore('devices', () => {
   function removeDevice(id: string): void {
     disconnect(id)
     devices.value = devices.value.filter(d => d.info.id !== id)
+    _saveKnownDevices()
   }
 
   // ── Reconnect ──────────────────────────────────────────────────────────────
@@ -361,6 +443,7 @@ export const useDeviceStore = defineStore('devices', () => {
     log,
     connectBLE,
     connectNFC,
+    restoreKnownDevices,
     connectMock,
     connectNextMock,
     disconnect,

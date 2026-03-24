@@ -826,6 +826,7 @@ onMounted(()=>{
     const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)
   }
   nextTick(()=>startHud())
+  store.restoreKnownDevices()
 })
 
 watch(activeDev,()=>{

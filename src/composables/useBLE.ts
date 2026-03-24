@@ -427,6 +427,23 @@ export async function reconnectDevice(handle: DeviceHandle, onLog?: LogFn): Prom
   }
 }
 
+/**
+ * Returns previously-permitted BLE devices (no picker, no gesture required).
+ * Uses navigator.bluetooth.getDevices() — Chrome 85+.
+ * On reload, call this to find devices the user already granted access to,
+ * then call connectGATT() on each one the user wants to reconnect.
+ */
+export async function getKnownDevices(): Promise<BluetoothDevice[]> {
+  if (!bleSupported || !navigator.bluetooth) return []
+  try {
+    // getDevices() is not available in all browsers yet
+    if (typeof (navigator.bluetooth as any).getDevices !== 'function') return []
+    return await (navigator.bluetooth as any).getDevices()
+  } catch {
+    return []
+  }
+}
+
 // ── QR code pairing ───────────────────────────────────────────────────────
 
 export async function connectByQR(qrPayload: string, onLog?: LogFn): Promise<ConnectResult | null> {
