@@ -432,7 +432,7 @@
   </div>
 
   <!-- ── Mockup Promo Popup ── -->
-  <a v-if="mockupBannerVisible" class="mockup-banner" href="/HyphiHub.html" target="_blank">
+  <a v-if="mockupBannerVisible && store.connectedCount === 0" class="mockup-banner" href="/HyphiHub.html" target="_blank">
     <span class="mockup-banner-icon">✦</span>
     <div class="mockup-banner-text">
       <span class="mockup-banner-title">No Device? No Problem!</span>
@@ -1121,7 +1121,7 @@ input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
 .mockup-banner-icon{font-size:18px;color:#fff;flex-shrink:0;}
 .mockup-banner-text{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
 .mockup-banner-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.5px;color:#fff;white-space:nowrap;}
-.mockup-banner-sub{font-size:11px;color:var(--accent);}
+.mockup-banner-sub{font-size:11px;color:#ff6b35;}
 .mockup-banner-close{background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:13px;padding:0 0 0 4px;flex-shrink:0;transition:color .2s;line-height:1;}
 .mockup-banner-close:hover{color:#fff;}
 </style>
