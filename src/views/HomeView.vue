@@ -430,6 +430,16 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Mockup Promo Popup ── -->
+  <a v-if="mockupBannerVisible" class="mockup-banner" href="/HyphiHub.html" target="_blank">
+    <span class="mockup-banner-icon">✦</span>
+    <div class="mockup-banner-text">
+      <span class="mockup-banner-title">No Device? No Problem!</span>
+      <span class="mockup-banner-sub">Try the experience →</span>
+    </div>
+    <button class="mockup-banner-close" @click.prevent="mockupBannerVisible = false">✕</button>
+  </a>
 </template>
 
 <script setup lang="ts">
@@ -445,6 +455,7 @@ const mobileMenuOpen  = ref(false)
 const logOpen         = ref(false)
 const toastVisible    = ref(false)
 const toastMsg        = ref('')
+const mockupBannerVisible = ref(true)
 
 window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 520 })
 
@@ -1089,4 +1100,28 @@ input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ── MOCKUP BANNER ── */
+.mockup-banner{
+  position:fixed;bottom:20px;right:20px;z-index:200;
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  background:var(--panel);
+  border:1px solid var(--accent2);
+  border-radius:12px;
+  box-shadow:0 4px 24px rgba(123,92,250,0.25);
+  text-decoration:none;
+  color:var(--text);
+  max-width:240px;
+  transition:box-shadow .25s,border-color .25s;
+  animation:bannerIn .35s cubic-bezier(0.4,0,0.2,1);
+}
+.mockup-banner:hover{box-shadow:0 6px 32px rgba(123,92,250,0.4);border-color:var(--accent);}
+@keyframes bannerIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.mockup-banner-icon{font-size:18px;color:var(--accent2);flex-shrink:0;}
+.mockup-banner-text{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.mockup-banner-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.5px;color:var(--text);white-space:nowrap;}
+.mockup-banner-sub{font-size:11px;color:var(--accent2);}
+.mockup-banner-close{background:none;border:none;color:var(--sub);cursor:pointer;font-size:13px;padding:0 0 0 4px;flex-shrink:0;transition:color .2s;line-height:1;}
+.mockup-banner-close:hover{color:var(--text);}
 </style>
