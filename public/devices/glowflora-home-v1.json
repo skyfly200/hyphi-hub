@@ -1,0 +1,49 @@
+{
+  "id": "glowflora-home-v1",
+  "name": "Glowflora Home",
+  "sku": "GFLO-HOME-V1",
+  "hw_version": "1.0",
+  "mcu": "Seeed Xiao ESP32-S3",
+  "docs": "https://wiki.hyphi.co/glowflora/home",
+  "firmware_repo": "https://github.com/skyfly200/GlowFlora",
+  "theme": "#00BCD4",
+  "ui": "glowflora-home",
+  "img": "/assets/glowflora-home-v1.png",
+
+  "power": {
+    "type": "LiPo",
+    "cap": 2000,
+    "io": "USB-C",
+    "v": 5
+  },
+
+  "leds": {
+    "qty": 60,
+    "type": "WS2812B",
+    "map": [
+      { "id": 0, "x": 50, "y": 90, "lbl": "Base" },
+      { "id": 1, "x": 50, "y": 10, "lbl": "Bloom" }
+    ],
+    "groups": [
+      { "name": "Stem", "ids": [0] },
+      { "name": "Bloom", "ids": [1] }
+    ]
+  },
+
+  "audio": {
+    "type": "PDM",
+    "fft": 4096,
+    "viz": [
+      { "id": 0, "name": "Pulse" },
+      { "id": 1, "name": "Spectrum" }
+    ]
+  },
+
+  "sensors": {
+    "audio": true,
+    "mic": "PDM",
+    "motion": false,
+    "temp": true,
+    "battery": true
+  }
+}

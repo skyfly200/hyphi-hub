@@ -1,0 +1,39 @@
+{
+  "id": "glowflora-clip-v1",
+  "name": "Glowflora Clip",
+  "sku": "GFLO-CLIP-V1",
+  "hw_version": "1.0",
+  "mcu": "Seeed Xiao ESP32-C3",
+  "docs": "https://wiki.hyphi.co/glowflora/clip",
+  "firmware_repo": "https://github.com/skyfly200/GlowFlora",
+  "theme": "#E91E63",
+  "ui": "glowflora-clip",
+  "img": "/assets/glowflora-clip-v1.jpg",
+
+  "power": {
+    "type": "LiPo",
+    "cap": 150,
+    "io": "USB-C",
+    "v": 5
+  },
+
+  "leds": {
+    "qty": 1,
+    "type": "LED filament",
+    "map": [
+      { "id": 0, "x": 50, "y": 50, "lbl": "Bloom" }
+    ],
+    "groups": [
+      { "name": "Bloom", "ids": [0] }
+    ]
+  },
+
+  "audio": null,
+
+  "sensors": {
+    "audio": false,
+    "motion": false,
+    "temp": false,
+    "battery": true
+  }
+}

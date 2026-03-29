@@ -1,0 +1,49 @@
+{
+  "id": "smart-sprout-v1.1",
+  "name": "Smart Sprout",
+  "sku": "SPRT-V1-ARTEMIS",
+  "hw_version": "1.1",
+  "mcu": "SparkFun Artemis Nano (Apollo3)",
+  "docs": "https://wiki.hyphi.co/glowflora/sprout",
+  "firmware_repo": "https://github.com/skyfly200/SmartSprout",
+  "theme": "#4CAF50",
+  "ui": "classic",
+  "img": "/assets/smart_sprout-V1.jpg",
+
+  "power": {
+    "type": "LiPo",
+    "cap": 2000,
+    "io": "USB-C",
+    "v": 5
+  },
+
+  "leds": {
+    "qty": 60,
+    "type": "WS2812B",
+    "pin": 12,
+    "map": [
+      { "id": 0, "x": 50, "y": 95, "lbl": "Root" },
+      { "id": 1, "x": 50, "y": 20, "lbl": "Top" }
+    ],
+    "groups": [
+      { "name": "Stem", "ids": [0, 1] }
+    ]
+  },
+
+  "audio": {
+    "type": "PDM",
+    "fft": 4096,
+    "viz": [
+      { "id": 0, "name": "Pulse" },
+      { "id": 1, "name": "Spectrum" }
+    ]
+  },
+
+  "sensors": {
+    "audio": true,
+    "mic": "PDM",
+    "motion": false,
+    "temp": true,
+    "battery": true
+  }
+}
