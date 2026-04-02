@@ -27,6 +27,7 @@ export const META_SENSORS_CHAR_UUID        = '95fdc978-217e-45d2-bc4d-95d8320617
 export const META_PROFILE_CHAR_UUID        = '0aaa858d-a11b-4de0-bae6-323db9d0ae16' as const
 
 // ── LED control characteristic UUIDs ──────────────────────────────────────
+export const LED_RESET_CHAR_UUID           = 'c97a62b4-5e3d-4f89-b001-6789abcdef01' as const
 export const LED_POWER_CHAR_UUID           = 'fd5897ee-c402-4260-a6dc-f3d7b109d724' as const
 export const LED_MODE_CHAR_UUID            = 'a96427ff-5f18-4a83-be0a-0a9a5ab91f13' as const
 export const LED_BRIGHT_CHAR_UUID          = '74c294a1-a211-4ac5-adfa-18b574f26239' as const
@@ -54,6 +55,7 @@ export type CharKey =
   | 'audioReactive' | 'autoThreshold' | 'relThreshold'
   | 'offThreshold' | 'staticThreshold' | 'damping' | 'btnAdvance'
   | 'battLevel' | 'temp' | 'manufacturer' | 'model' | 'firmware' | 'currentTime'
+  | 'reset'
 
 export interface DeviceMeta {
   index:   string[] | null
@@ -141,6 +143,7 @@ export interface IDeviceHandle {
   setStaticThreshold(val: number): Promise<void>
   setDamping(val: number): Promise<void>
   syncTime(): Promise<void>
+  reset(): Promise<void>
   disconnect(): void
 }
 

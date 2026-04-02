@@ -147,6 +147,7 @@ export class MockHandle implements IDeviceHandle {
   async setStaticThreshold(v: number):Promise<void> { this.state.staticThreshold= v;    this._log(`→ STATIC_THRESHOLD: ${v}`, 'ok') }
   async setDamping(val: number):      Promise<void> { this.state.damping        = val;  this._log(`→ DAMPING: ${val}`, 'ok') }
   async syncTime():                   Promise<void> {                                    this._log('→ CURRENT_TIME: synced', 'ok') }
+  async reset():                      Promise<void> {                                    this._log('→ RESET: sent', 'ok') }
 
   disconnect(): void {
     this.state.connected = false

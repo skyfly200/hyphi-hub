@@ -11,6 +11,7 @@ import {
   readNFCAndConnect,
   getKnownDevices,
   connectGATT,
+  DeviceHandle,
 } from '@/composables/useBLE'
 import { MockHandle, mockConnectResult, MOCK_DEVICES } from '@/composables/useMock'
 import type { MockDeviceDef } from '@/composables/useMock'
@@ -117,14 +118,14 @@ export const useDeviceStore = defineStore('devices', () => {
     }
     // Minimal stub handle — reconnect will replace it
     const stubHandle: IDeviceHandle = {
+      isMock: false,
       state: stubState,
-      get bleDevice() { return undefined as any },
       disconnect() {},
       setPower: async () => {}, setMode: async () => {}, setBrightness: async () => {},
       setColor: async () => {}, setSpeed: async () => {}, setAutoCycle: async () => {},
       setCycleTime: async () => {}, setAudioReactive: async () => {}, setAutoThreshold: async () => {},
       setRelThreshold: async () => {}, setOffThreshold: async () => {}, setStaticThreshold: async () => {},
-      setDamping: async () => {}, syncTime: async () => {},
+      setDamping: async () => {}, syncTime: async () => {}, reset: async () => {},
     }
     devices.value.push({
       info: { id, name, type: 'LED Device', hasBattery: false, hasAudio: false, ledCount: 60, ledType: 'WS2812B', voltage: 5, battCapMah: null, themeColor: '#ff6b35', modelUri: null },
@@ -264,6 +265,18 @@ export const useDeviceStore = defineStore('devices', () => {
     activeId.value = result.id
     log(`Connected: ${result.name}`, 'ok', result.id)
     _saveKnownDevices()
+
+    // Auto-reconnect on unexpected GATT disconnect (not when we call disconnect() ourselves —
+    // that sets dev.state.connected = false first, so the guard below skips it).
+    if (result.handle instanceof DeviceHandle) {
+      result.handle.bleDevice.addEventListener('gattserverdisconnected', () => {
+        const dev = devices.value.find(d => d.info.id === result.id)
+        if (!dev || !dev.state.connected) return   // intentional disconnect, skip
+        dev.state.connected = false
+        log(`${result.name} lost connection — reconnecting in 2s…`, 'info', result.id)
+        setTimeout(() => reconnect(result.id), 2000)
+      })
+    }
   }
 
   // ── Disconnect ────────────────────────────────────────────────────────────
@@ -271,9 +284,11 @@ export const useDeviceStore = defineStore('devices', () => {
     const idx = devices.value.findIndex(d => d.info.id === id)
     if (idx < 0) return
     const dev = devices.value[idx]
+    // Mark disconnected BEFORE calling handle.disconnect() so the auto-reconnect
+    // gattserverdisconnected listener can distinguish intentional from unexpected drops.
+    dev.state.connected = false
     dev.handle.disconnect()
     if (dev._pollInterval) clearInterval(dev._pollInterval)
-    dev.state.connected = false
     log(`Disconnected: ${dev.info.name}`, 'err', id)
     if (activeId.value === id) {
       const next = devices.value.find((d, i) => i !== idx && d.state.connected)
@@ -292,14 +307,61 @@ export const useDeviceStore = defineStore('devices', () => {
   async function reconnect(id: string): Promise<void> {
     const dev = devices.value.find(d => d.info.id === id)
     if (!dev) return
+
+    // Case 1: real DeviceHandle — GATT reconnect + char refresh
+    if (dev.handle instanceof DeviceHandle) {
+      try {
+        await bleReconnect(dev.handle, (msg, type) => log(msg, type, id))
+        dev.state.connected = true
+      } catch (err) {
+        log(`Reconnect failed: ${(err as Error).message}`, 'err', id)
+      }
+      return
+    }
+
+    // Case 2: mock — cannot BLE reconnect
+    if (dev.handle.isMock) {
+      log('Demo devices do not support reconnect', 'info', id)
+      return
+    }
+
+    // Case 3: stub handle (device was in localStorage but gatt ref was lost) —
+    // try getKnownDevices() first; if found, do a full connectGATT to replace stub.
+    log(`Looking for ${dev.info.name} in known BLE devices…`, 'info')
     try {
-      await bleReconnect(
-        dev.handle as import('@/composables/useBLE').DeviceHandle,
-        (msg, type) => log(msg, type, id)
-      )
-      dev.state.connected = true
+      const known = await getKnownDevices()
+      const bleDevice = known.find(d => d.id === id)
+      if (!bleDevice) {
+        log(`${dev.info.name} not found — open SCAN to re-pair`, 'info', id)
+        return
+      }
+      const result = await connectGATT(bleDevice, (msg, type) => log(msg, type, id))
+      if (!result) return
+      // Replace stub entry with a fully connected one
+      const idx = devices.value.findIndex(d => d.info.id === id)
+      if (idx >= 0) {
+        if (dev._pollInterval) clearInterval(dev._pollInterval)
+        devices.value.splice(idx, 1)
+      }
+      _addDevice(result)
     } catch (err) {
       log(`Reconnect failed: ${(err as Error).message}`, 'err', id)
+    }
+  }
+
+  // ── Reset device (firmware soft-reboot via BLE) ───────────────────────────
+  async function resetDevice(id: string): Promise<void> {
+    const dev = _device(id)
+    if (!dev) return
+    log(`Sending reset to ${dev.info.name}…`, 'info', id)
+    try {
+      await dev.handle.reset()
+      log(`Reset sent to ${dev.info.name}`, 'ok', id)
+      // Device will disconnect and re-advertise; mark disconnected and auto-reconnect
+      dev.state.connected = false
+      setTimeout(() => reconnect(id), 3000)
+    } catch (err) {
+      log(`Reset failed: ${(err as Error).message}`, 'err', id)
     }
   }
 
@@ -465,6 +527,7 @@ export const useDeviceStore = defineStore('devices', () => {
     setOffThreshold,
     setStaticThreshold,
     setDamping,
+    resetDevice,
     _addDevicePublic: _addDevice,
   }
 })

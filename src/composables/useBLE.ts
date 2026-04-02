@@ -14,6 +14,7 @@ import {
   META_AUDIO_CHAR_UUID, META_SENSORS_CHAR_UUID, META_PROFILE_CHAR_UUID,
   CURRENT_TIME_CHAR_UUID,
   BATT_LVL_CHAR_UUID, TEMP_CHAR_UUID,
+  LED_RESET_CHAR_UUID,
   LED_POWER_CHAR_UUID, LED_MODE_CHAR_UUID, LED_BRIGHT_CHAR_UUID,
   LED_COLOR_CHAR_UUID, LED_SPEED_CHAR_UUID, LED_CYCLE_CHAR_UUID,
   LED_CYCLE_TIME_CHAR_UUID, LED_CURRENT_CHAR_UUID,
@@ -80,6 +81,7 @@ export class DeviceHandle implements IDeviceHandle {
   async setStaticThreshold(v: number): Promise<void> { await this._write('staticThreshold',encodeFloat(v)) }
   async setDamping(val: number):       Promise<void> { await this._write('damping',        encodeByte(val)) }
   async syncTime():                    Promise<void> { await this._write('currentTime',    encodeCurrentTime()) }
+  async reset():                       Promise<void> { await this._write('reset',          encodeByte(1)) }
 
   private async _write(key: CharKey, bytes: Uint8Array): Promise<void> {
     const char = this.chars[key]
@@ -278,6 +280,7 @@ export async function connectGATT(bleDevice: BluetoothDevice, onLog?: LogFn): Pr
     ['staticThreshold', AUDIO_THRESH_STATIC_CHAR_UUID],
     ['damping',         AUDIO_DAMPING_CHAR_UUID],
     ['btnAdvance',      BUTTON_ADVANCE_CHAR_UUID],
+    ['reset',           LED_RESET_CHAR_UUID],
   ]
   const ledResults = await Promise.all(ledCharUUIDs.map(([, uuid]) => tryChar(ledSvc, uuid)))
   ledCharUUIDs.forEach(([key], i) => {
@@ -414,16 +417,56 @@ export async function connectGATT(bleDevice: BluetoothDevice, onLog?: LogFn): Pr
 export async function reconnectDevice(handle: DeviceHandle, onLog?: LogFn): Promise<void> {
   const log: LogFn = onLog ?? (() => { /* noop */ })
   if (!handle.bleDevice) throw new Error('No BLE device reference')
-  log(`Reconnecting to ${handle.bleDevice.name ?? 'device'}…`, 'info')
-  try {
-    await handle.bleDevice.gatt!.connect()
-    log('Reconnected', 'ok')
-    handle.state.connected = true
-    handle.syncTime().catch(() => { /* non-fatal */ })
-  } catch (err) {
-    const e = err as Error
-    log(`Reconnect failed: ${e.message}`, 'err')
-    throw e
+
+  const MAX_ATTEMPTS = 3
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      log(`Reconnecting to ${handle.bleDevice.name ?? 'device'} (attempt ${attempt}/${MAX_ATTEMPTS})…`, 'info')
+      const server = await handle.bleDevice.gatt!.connect()
+      log('GATT reconnected', 'ok')
+      handle.state.connected = true
+
+      // Refresh LED service characteristics so stale references don't cause silent write failures
+      const ledSvc = await tryService(server, LED_SERVICE_UUID)
+      if (ledSvc) {
+        const keyUUIDs: [CharKey, string][] = [
+          ['power',           LED_POWER_CHAR_UUID],
+          ['mode',            LED_MODE_CHAR_UUID],
+          ['brightness',      LED_BRIGHT_CHAR_UUID],
+          ['color',           LED_COLOR_CHAR_UUID],
+          ['speed',           LED_SPEED_CHAR_UUID],
+          ['cycle',           LED_CYCLE_CHAR_UUID],
+          ['cycleTime',       LED_CYCLE_TIME_CHAR_UUID],
+          ['current',         LED_CURRENT_CHAR_UUID],
+          ['audioReactive',   AUDIO_REACTIVE_CHAR_UUID],
+          ['autoThreshold',   AUDIO_THRESH_AUTO_CHAR_UUID],
+          ['relThreshold',    AUDIO_THRESH_REL_CHAR_UUID],
+          ['offThreshold',    AUDIO_THRESH_OFF_CHAR_UUID],
+          ['staticThreshold', AUDIO_THRESH_STATIC_CHAR_UUID],
+          ['damping',         AUDIO_DAMPING_CHAR_UUID],
+          ['btnAdvance',      BUTTON_ADVANCE_CHAR_UUID],
+          ['reset',           LED_RESET_CHAR_UUID],
+        ]
+        await Promise.all(keyUUIDs.map(async ([key, uuid]) => {
+          const c = await tryChar(ledSvc, uuid)
+          if (c) handle.chars[key] = c
+        }))
+        log(`LED chars refreshed (${Object.keys(handle.chars).length})`, 'ok')
+      }
+
+      handle.syncTime().catch(() => { /* non-fatal */ })
+      return
+
+    } catch (err) {
+      const e = err as Error
+      if (attempt >= MAX_ATTEMPTS) {
+        log(`Reconnect failed after ${MAX_ATTEMPTS} attempts: ${e.message}`, 'err')
+        throw e
+      }
+      const delay = 1000 * attempt   // 1 s, 2 s
+      log(`Attempt ${attempt} failed — retrying in ${delay / 1000}s…`, 'info')
+      await new Promise(r => setTimeout(r, delay))
+    }
   }
 }
 

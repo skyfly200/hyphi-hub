@@ -166,8 +166,27 @@
             <div class="panel-title">{{ activeDev.info.name.toUpperCase() }}</div>
             <div class="panel-subtitle">{{ activeDev.info.type }} · {{ activeDev.info.ledCount }} LEDs · {{ activeDev.info.voltage }}V</div>
           </div>
-          <div class="power-toggle" :class="{ on: ds.power }" @click="store.togglePower(activeDev.info.id)"></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn-reset" title="Reboot device" @click="showResetConfirm = true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+            <div class="power-toggle" :class="{ on: ds.power }" @click="store.togglePower(activeDev.info.id)"></div>
+          </div>
         </div>
+
+        <!-- Reset confirmation dialog -->
+        <Teleport to="body">
+          <div v-if="showResetConfirm" class="modal-backdrop" @click.self="showResetConfirm = false">
+            <div class="modal-box">
+              <div class="modal-title">REBOOT DEVICE?</div>
+              <div class="modal-body">This will send a reset command to {{ activeDev.info.name }}. The device will disconnect briefly and reconnect automatically.</div>
+              <div class="modal-actions">
+                <button class="modal-btn cancel" @click="showResetConfirm = false">CANCEL</button>
+                <button class="modal-btn confirm" @click="() => { store.resetDevice(activeDev.info.id); showResetConfirm = false }">REBOOT</button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <!-- Scenes -->
         <div class="section-label" style="margin-bottom:12px;">SCENES</div>
@@ -267,15 +286,15 @@
           <!-- Audio Responsive -->
           <div class="control-block full adv-block" v-if="activeDev.info.hasAudio">
             <div class="control-label">
-              AUDIO RESPONSIVE
+              AUDIO REACTIVE
               <div class="toggle-small" :class="{ on: ds.audioReactive }"
                    @click="store.setAudioReactive(activeDev.info.id, !ds.audioReactive)"></div>
             </div>
             <div v-if="ds.audioReactive" style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
 
-              <!-- Auto threshold toggle -->
+              <!-- Threshold mode: auto vs manual -->
               <div class="adv-row">
-                <span class="adv-row-label">Threshold</span>
+                <span class="adv-row-label">Mode</span>
                 <div class="audio-mode-group">
                   <button class="audio-mode-btn" :class="{ active: ds.autoThreshold }"
                           @click="store.setAutoThreshold(activeDev.info.id, true)">AUTO</button>
@@ -284,10 +303,10 @@
                 </div>
               </div>
 
-              <!-- Auto threshold controls -->
+              <!-- Auto mode: relative multiplier + noise floor offset -->
               <template v-if="ds.autoThreshold">
                 <div class="adv-row">
-                  <span class="adv-row-label">Relative</span>
+                  <span class="adv-row-label">Sensitivity</span>
                   <input type="range" class="speed-slider" min="0.1" max="5.0" step="0.1"
                          :value="ds.relThreshold ?? 1.5"
                          @input="store.setRelThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
@@ -295,7 +314,7 @@
                   <span class="adv-row-value">{{ (ds.relThreshold ?? 1.5).toFixed(1) }}×</span>
                 </div>
                 <div class="adv-row">
-                  <span class="adv-row-label">Offset</span>
+                  <span class="adv-row-label">Floor</span>
                   <input type="range" class="speed-slider" min="0.0" max="2.0" step="0.05"
                          :value="ds.offThreshold ?? 0.5"
                          @input="store.setOffThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
@@ -304,9 +323,9 @@
                 </div>
               </template>
 
-              <!-- Manual (fixed) threshold -->
+              <!-- Manual mode: fixed threshold level (0–1024 ADC units) -->
               <div v-else class="adv-row">
-                <span class="adv-row-label">Fixed</span>
+                <span class="adv-row-label">Threshold</span>
                 <input type="range" class="speed-slider" min="0" max="1024" step="1"
                        :value="ds.staticThreshold ?? 512"
                        @input="store.setStaticThreshold(activeDev.info.id, +($event.target as HTMLInputElement).value)"
@@ -314,9 +333,9 @@
                 <span class="adv-row-value">{{ ds.staticThreshold ?? 512 }}</span>
               </div>
 
-              <!-- Damping -->
+              <!-- Decay — shared by both modes -->
               <div class="adv-row">
-                <span class="adv-row-label">Damping</span>
+                <span class="adv-row-label">Decay</span>
                 <input type="range" class="speed-slider" min="0" max="255"
                        :value="ds.damping ?? 5"
                        @input="store.setDamping(activeDev.info.id, +($event.target as HTMLInputElement).value)"
@@ -456,6 +475,7 @@ const logOpen         = ref(false)
 const toastVisible    = ref(false)
 const toastMsg        = ref('')
 const mockupBannerVisible = ref(true)
+const showResetConfirm = ref(false)
 
 window.addEventListener('resize', () => { isMobile.value = window.innerWidth < 520 })
 
@@ -503,6 +523,22 @@ const fxDrawerOpen   = ref(false)
 const fxSelectMode   = ref<number|''>('')
 const fxSelectedIcon = ref('✦')
 const fxIconSearch   = ref('')
+
+const FX_DEFAULT_ICONS: Record<number, string> = {
+  0:'◼', 1:'💡', 2:'〰', 3:'🌊', 4:'🌊', 5:'🌊', 7:'🎲', 8:'🎲',
+  9:'⚡', 10:'⚡', 11:'🌈', 12:'🌀', 13:'👁️', 14:'👁️', 15:'🌅',
+  16:'🎭', 17:'🌈', 18:'▶️', 19:'✨', 20:'✨', 21:'✨', 22:'✨',
+  23:'✦', 24:'⭐', 25:'💫', 26:'⚡', 27:'🌈', 28:'⚡', 29:'💡',
+  30:'🌊', 31:'🌊', 32:'🌊', 33:'🌊', 43:'🔴', 44:'☄️',
+  45:'🎆', 46:'🎇', 49:'🔥', 50:'🔥', 51:'🔥', 59:'🦊',
+  60:'💧', 63:'🔴', 70:'💜', 74:'🎊', 75:'〰',
+}
+
+watch(fxSelectMode, (mode) => {
+  if (mode === '') return
+  const icon = FX_DEFAULT_ICONS[mode as number]
+  if (icon) fxSelectedIcon.value = icon
+})
 const fxDragSrc      = ref<number|null>(null)
 const fxDragOver     = ref<number|null>(null)
 
@@ -971,6 +1007,20 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px 80px;}
 .power-toggle.on{background:rgba(61,255,192,0.15);border-color:var(--connected);box-shadow:0 0 16px rgba(61,255,192,0.2);}
 .power-toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:all .45s;}
 .power-toggle.on::after{left:27px;background:var(--connected);}
+.btn-reset{display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--sub);cursor:pointer;transition:all .2s;flex-shrink:0;}
+.btn-reset:hover{border-color:rgba(255,140,0,0.6);color:rgba(255,140,0,0.9);box-shadow:0 0 8px rgba(255,140,0,0.15);}
+
+/* reset confirm modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);}
+.modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:28px 28px 22px;max-width:340px;width:90%;box-shadow:0 0 40px rgba(0,0,0,0.6);}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;margin-bottom:12px;}
+.modal-body{font-family:'DM Mono',monospace;font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:22px;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;}
+.modal-btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.5px;padding:8px 18px;border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all .2s;}
+.modal-btn.cancel{background:transparent;color:var(--sub);}
+.modal-btn.cancel:hover{border-color:var(--fg);color:var(--fg);}
+.modal-btn.confirm{background:rgba(255,80,80,0.12);border-color:rgba(255,80,80,0.5);color:rgba(255,100,100,0.9);}
+.modal-btn.confirm:hover{background:rgba(255,80,80,0.22);box-shadow:0 0 12px rgba(255,80,80,0.2);}
 
 /* scenes */
 .scene-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
