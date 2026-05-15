@@ -21,35 +21,57 @@
           >
             <span v-html="m.icon" />
             {{ m.label }}
-            <span v-if="!m.available" class="method-unavail">N/A</span>
+            <span v-if="m.id === 'wifi'" class="method-beta">BETA</span>
+            <span v-else-if="!m.available" class="method-unavail">N/A</span>
           </button>
         </div>
 
         <!-- WiFi / WLED -->
         <div v-if="activeMethod === 'wifi'" class="scan-body wifi-body">
-          <div class="wifi-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
-            </svg>
-          </div>
-          <p class="scan-hint">Enter the IP address of your WLED device on your local network</p>
-          <div class="wifi-input-row">
-            <input
-              v-model="wifiIP"
-              class="wifi-input"
-              type="text"
-              placeholder="192.168.1.100"
-              :disabled="wifiConnecting"
-              @keyup.enter="startWiFiConnect"
-            />
-          </div>
-          <div v-if="wifiStatus" class="wifi-status" :class="wifiStatusType">{{ wifiStatus }}</div>
-          <button class="scan-btn wifi-btn" :disabled="wifiConnecting || !wifiIP.trim()" @click="startWiFiConnect">
-            {{ wifiConnecting ? 'CONNECTING…' : 'CONNECT' }}
-          </button>
-          <p class="scan-hint wifi-cors-hint">
-            Note: WLED device must be on the same WiFi network. If using HTTPS hosting, your browser may block HTTP device requests.
-          </p>
+          <!-- Beta gate -->
+          <template v-if="!wledEnabled">
+            <div class="wled-gate-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
+              </svg>
+            </div>
+            <div class="wled-gate-title">WLED WiFi Control</div>
+            <p class="wled-gate-desc">
+              Connect to <strong>WLED</strong> LED controllers on your local WiFi network and control them alongside your BLE devices.
+            </p>
+            <div class="wled-gate-warning">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg>
+              <span>This feature is in <strong>beta</strong>. If the app is loaded over HTTPS, your browser may block HTTP requests to local WLED devices. It works reliably when the app is served over HTTP on your local network.</span>
+            </div>
+            <button class="scan-btn wifi-enable-btn" @click="showConfirm = true">
+              ENABLE WLED (BETA)
+            </button>
+          </template>
+
+          <!-- Connect UI (enabled) -->
+          <template v-else>
+            <div class="wifi-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
+              </svg>
+            </div>
+            <p class="scan-hint">Enter the IP address of your WLED device</p>
+            <div class="wifi-input-row">
+              <input
+                v-model="wifiIP"
+                class="wifi-input"
+                type="text"
+                placeholder="192.168.1.100"
+                :disabled="wifiConnecting"
+                @keyup.enter="startWiFiConnect"
+              />
+            </div>
+            <div v-if="wifiStatus" class="wifi-status" :class="wifiStatusType">{{ wifiStatus }}</div>
+            <button class="scan-btn wifi-btn" :disabled="wifiConnecting || !wifiIP.trim()" @click="startWiFiConnect">
+              {{ wifiConnecting ? 'CONNECTING…' : 'CONNECT' }}
+            </button>
+            <button class="wifi-disable-link" @click="wledEnabled = false">Disable WLED beta</button>
+          </template>
         </div>
 
         <!-- BLE Scan -->
@@ -119,29 +141,58 @@
         </div>
       </div>
     </div>
+
+    <!-- WLED beta confirmation modal -->
+    <Transition name="confirm">
+      <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
+        <div class="confirm-modal">
+          <div class="confirm-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>
+            </svg>
+          </div>
+          <div class="confirm-title">WLED BETA — KNOWN LIMITATION</div>
+          <p class="confirm-body">
+            WLED devices speak plain <strong>HTTP</strong>. If this app is loaded from an <strong>HTTPS</strong> URL, your browser will block those requests — this is a browser security rule that can't be bypassed from a web page.
+          </p>
+          <p class="confirm-body">
+            <strong>WLED will work</strong> when the app is served over HTTP on your local network, or when accessed from <code>localhost</code>.
+          </p>
+          <p class="confirm-body" style="color:#6060a0">
+            Full phone support is coming in a future native app release.
+          </p>
+          <div class="confirm-actions">
+            <button class="confirm-btn cancel" @click="showConfirm = false">CANCEL</button>
+            <button class="confirm-btn enable" @click="enableWled">ENABLE ANYWAY</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDeviceStore } from '@/stores/deviceStore'
-import { bleSupported, requestBLEDevice, connectGATT, readNFCAndConnect } from '@/composables/useBLE'
+import { bleSupported, requestBLEDevice, connectGATT } from '@/composables/useBLE'
 import { MOCK_DEVICES } from '@/composables/useMock'
+import { wledBetaEnabled as wledEnabled } from '@/composables/useSettings'
 
 const props = defineProps({ modelValue: Boolean })
 const emit  = defineEmits(['update:modelValue'])
 
 const store = useDeviceStore()
-const activeMethod = ref('ble')
+const activeMethod  = ref('ble')
 const connecting    = ref(false)
 const scanning      = ref(false)
 const scanningQR    = ref(false)
-const nfcReading   = ref(false)
+const nfcReading    = ref(false)
 const bleStatusText = ref('Click SCAN to open device picker')
-const qrHint       = ref('Point camera at the QR code on your device')
-const nfcLabel     = ref('Hold your device near the NFC tag')
+const qrHint        = ref('Point camera at the QR code on your device')
+const nfcLabel      = ref('Hold your device near the NFC tag')
 const nfcSupported  = 'NDEFReader' in window
 const cameraSupported = !!(navigator.mediaDevices?.getUserMedia)
+const showConfirm   = ref(false)
 
 const subText = computed(() => ({
   ble:  'Scan for nearby BLE devices',
@@ -169,11 +220,17 @@ const methods = [
   },
 ]
 
-// ── WiFi / WLED state ──────────────────────────────────────────────────────
-const wifiIP           = ref('')
-const wifiConnecting   = ref(false)
-const wifiStatus       = ref('')
-const wifiStatusType   = ref<'ok' | 'err' | ''>('')
+// ── WLED beta gate ─────────────────────────────────────────────────────────
+function enableWled() {
+  wledEnabled.value = true
+  showConfirm.value = false
+}
+
+// ── WiFi connect ───────────────────────────────────────────────────────────
+const wifiIP         = ref('')
+const wifiConnecting = ref(false)
+const wifiStatus     = ref('')
+const wifiStatusType = ref<'ok' | 'err' | ''>('')
 
 async function startWiFiConnect() {
   const ip = wifiIP.value.trim()
@@ -194,6 +251,7 @@ async function startWiFiConnect() {
   }
 }
 
+// ── BLE ────────────────────────────────────────────────────────────────────
 async function startBLEScan() {
   if (connecting.value) return
   connecting.value = true
@@ -201,16 +259,10 @@ async function startBLEScan() {
   bleStatusText.value = 'Opening device picker…'
   try {
     const bleDevice = await requestBLEDevice((msg, type) => store.log(msg, type))
-    if (!bleDevice) {
-      bleStatusText.value = 'Scan cancelled'
-      return
-    }
+    if (!bleDevice) { bleStatusText.value = 'Scan cancelled'; return }
     bleStatusText.value = `Found ${bleDevice.name ?? bleDevice.id} — connecting…`
     const result = await connectGATT(bleDevice, (msg, type) => store.log(msg, type))
-    if (result) {
-      store._addDevicePublic(result)
-      emit('update:modelValue', false)
-    }
+    if (result) { store._addDevicePublic(result); emit('update:modelValue', false) }
   } catch (e: unknown) {
     bleStatusText.value = `Error: ${(e as Error).message}`
   } finally {
@@ -219,6 +271,7 @@ async function startBLEScan() {
   }
 }
 
+// ── NFC ────────────────────────────────────────────────────────────────────
 async function startNFC() {
   if (nfcReading.value) return
   nfcReading.value = true
@@ -226,22 +279,18 @@ async function startNFC() {
   try {
     await store.connectNFC()
     emit('update:modelValue', false)
-  } catch (e) {
-    nfcLabel.value = `NFC error: ${e.message}`
+  } catch (e: unknown) {
+    nfcLabel.value = `NFC error: ${(e as Error).message}`
   } finally {
     nfcReading.value = false
   }
 }
 
+// ── QR ─────────────────────────────────────────────────────────────────────
 function startQRScan() {
-  // Real QR scanning requires a library like jsQR + getUserMedia
-  // For now, open BLE picker as fallback after QR decode
   qrHint.value = 'QR scanning requires camera — launching BLE picker…'
   scanningQR.value = true
-  setTimeout(() => {
-    scanningQR.value = false
-    startBLEScan()
-  }, 1500)
+  setTimeout(() => { scanningQR.value = false; startBLEScan() }, 1500)
 }
 
 function addMockDevice() {
@@ -257,7 +306,7 @@ function addMockDevice() {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.75);
   backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-end; justify-content: center;
   z-index: 1000;
   opacity: 0; pointer-events: none;
   transition: opacity .3s;
@@ -291,6 +340,7 @@ function addMockDevice() {
 .scan-method-tab.active { border-color:#7b5cfa; color:#e8e8f0; }
 .scan-method-tab.disabled { opacity:.4; cursor:not-allowed; }
 .method-unavail { font-size:8px; color:#ff5577; }
+.method-beta { font-size:8px; color:#f5a623; letter-spacing:1px; }
 
 .scan-body { padding: 12px 0; }
 .scan-status-msg { display:flex; flex-direction:column; align-items:center; gap:12px; padding:24px; }
@@ -317,9 +367,30 @@ function addMockDevice() {
 .ble-hint { font-size:10px !important; color:#6060a0 !important; }
 .ble-hint code { background:#16161f; padding:2px 4px; border-radius:3px; font-size:9px; }
 
-/* WiFi */
-.wifi-body { display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px 0; }
-.wifi-icon { color:#3dffc0; margin-bottom:4px; }
+/* ── WiFi gate ── */
+.wifi-body { display:flex; flex-direction:column; align-items:center; gap:14px; padding:16px 0; }
+.wled-gate-icon { color:#3dffc0; opacity:.7; }
+.wled-gate-title {
+  font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:3px; color:#e8e8f0;
+}
+.wled-gate-desc {
+  font-family:'DM Mono',monospace; font-size:11px; color:#7a7a9a;
+  text-align:center; line-height:1.6; margin:0;
+}
+.wled-gate-desc strong { color:#b0b0c0; }
+.wled-gate-warning {
+  display:flex; gap:10px; align-items:flex-start;
+  padding:12px 14px; border-radius:8px;
+  border:1px solid #f5a62333; background:#f5a6230a;
+  font-family:'DM Mono',monospace; font-size:10px; color:#c49040;
+  line-height:1.55;
+}
+.wled-gate-warning strong { color:#f5a623; }
+.wifi-enable-btn { border-color:#3dffc0; color:#3dffc0; }
+.wifi-enable-btn:hover { background:#3dffc022; }
+
+/* ── WiFi connect (enabled) ── */
+.wifi-icon { color:#3dffc0; }
 .wifi-input-row { width:100%; }
 .wifi-input {
   width:100%; box-sizing:border-box;
@@ -334,23 +405,61 @@ function addMockDevice() {
 .wifi-input:disabled { opacity:.4; }
 .wifi-btn { border-color:#3dffc0; color:#3dffc0; margin-top:0; }
 .wifi-btn:hover:not(:disabled) { background:#3dffc022; }
-.wifi-status {
-  font-family:'DM Mono',monospace; font-size:11px;
-  letter-spacing:1px; color:#7a7a9a;
-}
+.wifi-status { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px; color:#7a7a9a; }
 .wifi-status.ok  { color:#3dffc0; }
 .wifi-status.err { color:#ff5577; }
-.wifi-cors-hint  { font-size:9px !important; color:#3a3a5088 !important; max-width:340px; text-align:center; }
+.wifi-disable-link {
+  background:none; border:none; color:#3a3a50;
+  font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
+  cursor:pointer; margin-top:4px; text-decoration:underline;
+}
+.wifi-disable-link:hover { color:#6060a0; }
+
+/* ── Beta confirm modal ── */
+.confirm-overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center;
+  z-index:1100;
+}
+.confirm-modal {
+  background:#16161f; border:1px solid #f5a62344;
+  border-radius:14px; padding:28px 24px;
+  width:calc(100% - 48px); max-width:400px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.confirm-icon { color:#f5a623; align-self:center; }
+.confirm-title {
+  font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:3px;
+  color:#e8e8f0; text-align:center;
+}
+.confirm-body {
+  font-family:'DM Mono',monospace; font-size:11px; color:#7a7a9a;
+  line-height:1.6; margin:0;
+}
+.confirm-body strong { color:#b0b0c0; }
+.confirm-body code { background:#0a0a0f; padding:1px 5px; border-radius:3px; font-size:10px; }
+.confirm-actions { display:flex; gap:10px; margin-top:4px; }
+.confirm-btn {
+  flex:1; padding:11px; border-radius:8px;
+  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+  cursor:pointer; transition:all .2s;
+}
+.confirm-btn.cancel { border:1px solid #2a2a3a; background:transparent; color:#6060a0; }
+.confirm-btn.cancel:hover { border-color:#6060a0; color:#a0a0c0; }
+.confirm-btn.enable { border:1px solid #3dffc0; background:transparent; color:#3dffc0; }
+.confirm-btn.enable:hover { background:#3dffc022; }
+
+.confirm-enter-active, .confirm-leave-active { transition: opacity .2s, transform .2s; }
+.confirm-enter-from, .confirm-leave-to { opacity:0; transform:scale(.96); }
 
 /* QR */
 .qr-viewfinder {
   position:relative; width:200px; height:200px;
   margin:0 auto; background:#0a0a0f;
 }
-.qr-corner {
-  position:absolute; width:20px; height:20px;
-  border-color:#ff6b35; border-style:solid;
-}
+.qr-corner { position:absolute; width:20px; height:20px; border-color:#ff6b35; border-style:solid; }
 .qr-corner.tl { top:0; left:0; border-width:2px 0 0 2px; }
 .qr-corner.tr { top:0; right:0; border-width:2px 2px 0 0; }
 .qr-corner.bl { bottom:0; left:0; border-width:0 0 2px 2px; }
@@ -361,27 +470,18 @@ function addMockDevice() {
   opacity:0; transition:opacity .3s;
 }
 .qr-scan-line.active { opacity:1; animation: scan-sweep 1.8s ease-in-out infinite; }
-@keyframes scan-sweep {
-  0%,100% { top:8px; } 50% { top:calc(100% - 8px); }
-}
+@keyframes scan-sweep { 0%,100% { top:8px; } 50% { top:calc(100% - 8px); } }
 
 /* NFC */
 .nfc-body { display:flex; flex-direction:column; align-items:center; padding:20px 0; }
-.nfc-rings {
-  position:relative; width:120px; height:120px;
-  display:flex; align-items:center; justify-content:center;
-}
+.nfc-rings { position:relative; width:120px; height:120px; display:flex; align-items:center; justify-content:center; }
 .nfc-ring {
   position:absolute;
   width:calc(40px * var(--i)); height:calc(40px * var(--i));
-  border-radius:50%; border:1.5px solid #2a2a3a;
-  transition:border-color .3s;
+  border-radius:50%; border:1.5px solid #2a2a3a; transition:border-color .3s;
 }
 .nfc-ring.tap { border-color:#3dffc0; animation:nfc-pulse 1s ease-out infinite; }
-@keyframes nfc-pulse {
-  0% { transform:scale(1); opacity:1; }
-  100% { transform:scale(1.15); opacity:0; }
-}
+@keyframes nfc-pulse { 0% { transform:scale(1); opacity:1; } 100% { transform:scale(1.15); opacity:0; } }
 .nfc-icon { position:relative; z-index:1; color:#3dffc0; }
 .nfc-label { font-family:'DM Mono',monospace; font-size:11px; color:#6060a0; margin-top:16px; }
 </style>
