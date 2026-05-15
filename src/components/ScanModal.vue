@@ -25,6 +25,33 @@
           </button>
         </div>
 
+        <!-- WiFi / WLED -->
+        <div v-if="activeMethod === 'wifi'" class="scan-body wifi-body">
+          <div class="wifi-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
+            </svg>
+          </div>
+          <p class="scan-hint">Enter the IP address of your WLED device on your local network</p>
+          <div class="wifi-input-row">
+            <input
+              v-model="wifiIP"
+              class="wifi-input"
+              type="text"
+              placeholder="192.168.1.100"
+              :disabled="wifiConnecting"
+              @keyup.enter="startWiFiConnect"
+            />
+          </div>
+          <div v-if="wifiStatus" class="wifi-status" :class="wifiStatusType">{{ wifiStatus }}</div>
+          <button class="scan-btn wifi-btn" :disabled="wifiConnecting || !wifiIP.trim()" @click="startWiFiConnect">
+            {{ wifiConnecting ? 'CONNECTING…' : 'CONNECT' }}
+          </button>
+          <p class="scan-hint wifi-cors-hint">
+            Note: WLED device must be on the same WiFi network. If using HTTPS hosting, your browser may block HTTP device requests.
+          </p>
+        </div>
+
         <!-- BLE Scan -->
         <div v-if="activeMethod === 'ble'" class="scan-body">
           <div class="scan-status-msg" :class="scanning ? 'scanning' : ''">
@@ -117,15 +144,20 @@ const nfcSupported  = 'NDEFReader' in window
 const cameraSupported = !!(navigator.mediaDevices?.getUserMedia)
 
 const subText = computed(() => ({
-  ble: 'Scan for nearby BLE devices',
-  qr:  'Scan the QR code on your device',
-  nfc: 'Hold near an NFC-enabled device',
-}[activeMethod.value]))
+  ble:  'Scan for nearby BLE devices',
+  wifi: 'Connect to a WLED device over WiFi',
+  qr:   'Scan the QR code on your device',
+  nfc:  'Hold near an NFC-enabled device',
+}[activeMethod.value] ?? ''))
 
 const methods = [
   {
     id: 'ble', label: 'BLE', available: true,
     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l4 4-4 4V2zM12 14l4 4-4 4v-8zM4 7l4 5-4 5"/></svg>'
+  },
+  {
+    id: 'wifi', label: 'WIFI', available: true,
+    icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>'
   },
   {
     id: 'qr', label: 'QR CODE', available: cameraSupported,
@@ -136,6 +168,31 @@ const methods = [
     icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 00-8-8M16 12a4 4 0 00-4-4M12 12h.01"/></svg>'
   },
 ]
+
+// ── WiFi / WLED state ──────────────────────────────────────────────────────
+const wifiIP           = ref('')
+const wifiConnecting   = ref(false)
+const wifiStatus       = ref('')
+const wifiStatusType   = ref<'ok' | 'err' | ''>('')
+
+async function startWiFiConnect() {
+  const ip = wifiIP.value.trim()
+  if (!ip || wifiConnecting.value) return
+  wifiConnecting.value = true
+  wifiStatus.value     = `Connecting to ${ip}…`
+  wifiStatusType.value = ''
+  try {
+    await store.connectWiFi(ip)
+    wifiStatus.value     = 'Connected!'
+    wifiStatusType.value = 'ok'
+    setTimeout(() => emit('update:modelValue', false), 600)
+  } catch (e: unknown) {
+    wifiStatus.value     = `Error: ${(e as Error).message}`
+    wifiStatusType.value = 'err'
+  } finally {
+    wifiConnecting.value = false
+  }
+}
 
 async function startBLEScan() {
   if (connecting.value) return
@@ -259,6 +316,31 @@ function addMockDevice() {
 .ble-unsupported p { font-family:'DM Mono',monospace; font-size:11px; color:#ff8899; margin:0 0 8px; }
 .ble-hint { font-size:10px !important; color:#6060a0 !important; }
 .ble-hint code { background:#16161f; padding:2px 4px; border-radius:3px; font-size:9px; }
+
+/* WiFi */
+.wifi-body { display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px 0; }
+.wifi-icon { color:#3dffc0; margin-bottom:4px; }
+.wifi-input-row { width:100%; }
+.wifi-input {
+  width:100%; box-sizing:border-box;
+  padding:10px 14px; border-radius:8px;
+  border:1px solid #2a2a3a; background:#0a0a0f;
+  color:#e8e8f0; font-family:'DM Mono',monospace;
+  font-size:13px; letter-spacing:1px;
+  transition:border-color .2s;
+}
+.wifi-input::placeholder { color:#3a3a50; }
+.wifi-input:focus { outline:none; border-color:#3dffc0; }
+.wifi-input:disabled { opacity:.4; }
+.wifi-btn { border-color:#3dffc0; color:#3dffc0; margin-top:0; }
+.wifi-btn:hover:not(:disabled) { background:#3dffc022; }
+.wifi-status {
+  font-family:'DM Mono',monospace; font-size:11px;
+  letter-spacing:1px; color:#7a7a9a;
+}
+.wifi-status.ok  { color:#3dffc0; }
+.wifi-status.err { color:#ff5577; }
+.wifi-cors-hint  { font-size:9px !important; color:#3a3a5088 !important; max-width:340px; text-align:center; }
 
 /* QR */
 .qr-viewfinder {

@@ -12,6 +12,7 @@ import {
   getKnownDevices,
   connectGATT,
 } from '@/composables/useBLE'
+import { connectWLED } from '@/composables/useWLED'
 import { MockHandle, mockConnectResult, MOCK_DEVICES } from '@/composables/useMock'
 import type { MockDeviceDef } from '@/composables/useMock'
 import type { DeviceState, DeviceInfo, IDeviceHandle, ConnectResult, LogType } from '@/ble-protocol'
@@ -72,20 +73,38 @@ export const useDeviceStore = defineStore('devices', () => {
   }
 
   /**
-   * On app load, check navigator.bluetooth.getDevices() for previously
-   * permitted devices and attempt silent GATT reconnect for each one.
+   * On app load, restore previously connected devices.
+   * WLED devices reconnect over WiFi; BLE devices use navigator.bluetooth.getDevices().
    */
   async function restoreKnownDevices(): Promise<void> {
     const saved = _loadKnownDeviceIds()
     if (saved.length === 0) return
+
+    const wledSaved = saved.filter(s => s.id.startsWith('wled-'))
+    const bleSaved  = saved.filter(s => !s.id.startsWith('wled-'))
+
+    // Restore WLED devices
+    for (const s of wledSaved) {
+      if (devices.value.find(d => d.info.id === s.id)) continue
+      const ip = s.id.slice('wled-'.length)
+      log(`Auto-reconnecting to WLED ${s.name} at ${ip}…`, 'info')
+      try {
+        const result = await connectWLED(ip, (msg, type) => log(msg, type))
+        if (result) _addDevice(result)
+        else { _addStub(s.id, s.name); log(`WLED ${s.name} unreachable — click Reconnect`, 'info') }
+      } catch {
+        _addStub(s.id, s.name)
+        log(`Auto-reconnect failed for ${s.name} — click Reconnect`, 'info')
+      }
+    }
+
+    // Restore BLE devices
+    if (bleSaved.length === 0) return
     const known = await getKnownDevices()
     if (known.length === 0) {
-      log(`${saved.length} known device(s) — click Reconnect to restore`, 'info')
-      // Pre-populate disconnected stubs so user sees them with reconnect buttons
-      for (const s of saved) {
-        if (!devices.value.find(d => d.info.id === s.id)) {
-          _addStub(s.id, s.name)
-        }
+      log(`${bleSaved.length} known BLE device(s) — click Reconnect to restore`, 'info')
+      for (const s of bleSaved) {
+        if (!devices.value.find(d => d.info.id === s.id)) _addStub(s.id, s.name)
       }
       return
     }
@@ -96,7 +115,6 @@ export const useDeviceStore = defineStore('devices', () => {
         const result = await connectGATT(bleDevice, (msg, type) => log(msg, type))
         if (result) _addDevice(result)
       } catch {
-        // Silent fail — add stub so user can manually reconnect
         _addStub(bleDevice.id, bleDevice.name ?? 'Unknown Device')
         log(`Auto-reconnect failed for ${bleDevice.name ?? bleDevice.id} — click Reconnect`, 'info')
       }
@@ -167,6 +185,17 @@ export const useDeviceStore = defineStore('devices', () => {
       _addDevice(result)
     } catch (err) {
       log(`Connection failed: ${(err as Error).message}`, 'err')
+    }
+  }
+
+  // ── Connect via WiFi (WLED) ───────────────────────────────────────────────
+  async function connectWiFi(ip: string): Promise<void> {
+    try {
+      const result = await connectWLED(ip, (msg, type) => log(msg, type))
+      if (!result) return
+      _addDevice(result)
+    } catch (err) {
+      log(`WiFi connection failed: ${(err as Error).message}`, 'err')
     }
   }
 
@@ -292,6 +321,23 @@ export const useDeviceStore = defineStore('devices', () => {
   async function reconnect(id: string): Promise<void> {
     const dev = devices.value.find(d => d.info.id === id)
     if (!dev) return
+
+    if (id.startsWith('wled-')) {
+      const ip = id.slice('wled-'.length)
+      try {
+        const result = await connectWLED(ip, (msg, type) => log(msg, type, id))
+        if (result) {
+          dev.handle.disconnect()
+          dev.handle = result.handle
+          Object.assign(dev.state, result.initialState, { color2: dev.state.color2, color3: dev.state.color3, gamma: dev.state.gamma })
+          dev.state.connected = true
+        }
+      } catch (err) {
+        log(`Reconnect failed: ${(err as Error).message}`, 'err', id)
+      }
+      return
+    }
+
     try {
       await bleReconnect(
         dev.handle as import('@/composables/useBLE').DeviceHandle,
@@ -443,6 +489,7 @@ export const useDeviceStore = defineStore('devices', () => {
     log,
     connectBLE,
     connectNFC,
+    connectWiFi,
     restoreKnownDevices,
     connectMock,
     connectNextMock,

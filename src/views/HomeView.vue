@@ -55,7 +55,7 @@
         </svg>
         <div class="logo-text">
           HYPHI HUB
-          <span>BLE LIGHT CONTROL</span>
+          <span>LIGHT CONTROL</span>
         </div>
       </div>
       <div class="header-right">
@@ -101,6 +101,9 @@
             <div class="device-name">
               {{ dev.info.name }}
               <span class="device-badge">{{ dev.info.type }}</span>
+              <span class="device-conn-badge" :class="dev.info.id.startsWith('wled-') ? 'wifi' : 'ble'">
+                {{ dev.info.id.startsWith('wled-') ? 'WiFi' : 'BLE' }}
+              </span>
               <div class="device-color-preview" :style="{ background: dev.state?.color ?? '#ff6b35' }"></div>
             </div>
             <div class="device-id">{{ dev.info.id.slice(0, 22) }}</div>
@@ -930,6 +933,9 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px 80px;}
 .device-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .device-id{font-family:'DM Mono',monospace;font-size:10px;color:var(--sub);letter-spacing:1px;}
 .device-badge{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(123,92,250,0.2);color:var(--accent2);letter-spacing:1px;text-transform:uppercase;}
+.device-conn-badge{font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:1px;font-family:'DM Mono',monospace;}
+.device-conn-badge.ble{background:rgba(255,107,53,0.15);color:var(--accent);}
+.device-conn-badge.wifi{background:rgba(61,255,192,0.15);color:var(--connected);}
 .device-color-preview{width:20px;height:20px;border-radius:4px;border:1px solid var(--border);margin-left:auto;flex-shrink:0;}
 .btn-reconnect{padding:3px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;background:transparent;border:1px solid var(--accent2);border-radius:4px;color:var(--accent2);cursor:pointer;transition:all .2s;}
 .btn-remove{padding:3px 8px;font-family:'DM Mono',monospace;font-size:9px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--sub);cursor:pointer;margin-left:auto;transition:all .2s;}
